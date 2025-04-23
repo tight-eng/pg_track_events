@@ -106,4 +106,43 @@ export async function init(
   }
 }
 
-function upsertFunctions(sql: SQL) {}
+export async function addTriggersForNewTables(sql: SQL) {
+  // Get all tables in the public schema
+  const result = await sql`
+    SELECT table_name 
+    FROM information_schema.tables 
+    WHERE table_schema = 'public'
+  `;
+
+  const tables = result.map((row: { table_name: string }) => row.table_name);
+
+  // Add triggers for each table that doesn't already have one
+  console.log("\nChecking and creating triggers for tables:");
+
+  for (const table of tables) {
+    const spinner = ora(`Checking trigger for ${table}`).start();
+
+    // Check if trigger exists
+    const triggerExists = await sql`
+      SELECT 1 
+      FROM information_schema.triggers
+      WHERE trigger_schema = 'public'
+        AND event_object_table = ${table}
+        AND trigger_name = ${table + "_audit_trigger"}
+    `;
+
+    if (triggerExists.length === 0) {
+      // Create trigger if it doesn't exist
+      await sql.unsafe(`CREATE TRIGGER ${table}_audit_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON public.${table}
+        FOR EACH ROW
+        EXECUTE FUNCTION ${schemaName}.log_table_changes();`);
+
+      spinner.succeed(`Created trigger for ${table}`);
+    } else {
+      spinner.info(`Trigger already exists for ${table}`);
+    }
+  }
+
+  console.log("\n✨ All triggers checked and created successfully");
+}

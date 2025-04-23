@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import prompts from "prompts";
-import { init } from "./init";
+import { addTriggersForNewTables, init } from "./init";
+import { SQL } from "bun";
 const program = new Command();
 
 program
@@ -22,6 +23,21 @@ program
     });
 
     await init(response.databaseUrl, options.reset, options.dryRun);
+  });
+
+program
+  .command("sync-tables")
+  .description("Resyncs triggers for all tables")
+  .action(async (options) => {
+    const response = await prompts({
+      type: "password",
+      name: "databaseUrl",
+      message: "Database URL",
+    });
+
+    const sql = new SQL(response.databaseUrl);
+
+    await addTriggersForNewTables(sql);
   });
 
 program.parse();
