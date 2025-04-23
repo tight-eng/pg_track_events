@@ -50,9 +50,10 @@ export async function init(
 
   // Then create the table
   await sql`CREATE TABLE ${sql(schemaName)}.event_log (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGSERIAL PRIMARY KEY,
     event_type ${sql(schemaName)}.event_type NOT NULL,
     row_table_name TEXT NOT NULL,
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     old_row JSONB,
     new_row JSONB,
     CONSTRAINT event_type_update_check CHECK (
