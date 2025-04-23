@@ -1,0 +1,26 @@
+{
+  "name": "tightdb",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bin": {
+    "my-cli": "./index.ts"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "@types/prompts": "2.4.9"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "ora": "^8.2.0",
+    "prompts": "^2.4.2"
+  }
+}
