@@ -1,15 +1,11 @@
-# tightdb
+Bun 1.2 Required
 
-To install dependencies:
-
-```bash
+```
 bun install
 ```
 
-To run:
+## Usage
 
-```bash
-bun run index.ts
 ```
-
-This project was created using `bun init` in bun v1.0.0. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+bun run index.ts init
+```
