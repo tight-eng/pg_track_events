@@ -53,7 +53,7 @@ export async function init(
     id BIGSERIAL PRIMARY KEY,
     event_type ${sql(schemaName)}.event_type NOT NULL,
     row_table_name TEXT NOT NULL,
-    logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     old_row JSONB,
     new_row JSONB,
     CONSTRAINT event_type_update_check CHECK (
