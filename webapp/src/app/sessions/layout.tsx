@@ -60,6 +60,7 @@ export default function SessionsLayout({
       secondaryNavItems={sessionItems}
       onCreateFolder={() => console.log("Create session folder")}
       onCreateView={() => console.log("Create session view")}
+      defaultSelection="/sessions/conversion/signup"
     >
       {children}
     </SectionLayout>

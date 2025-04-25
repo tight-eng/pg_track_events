@@ -20,7 +20,6 @@ import {
 const navItems = [
   { name: "Dashboards", icon: Home, href: "/dashboards" },
   { name: "Customers", icon: Users, href: "/customers" },
-  { name: "Experiments", icon: FlaskConical, href: "/experiments" },
   { name: "Session Replays", icon: Video, href: "/sessions" },
   { name: "Workflows", icon: Workflow, href: "/workflows" },
 ];

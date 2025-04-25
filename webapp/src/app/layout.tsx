@@ -6,7 +6,7 @@ import { PrimaryNav } from "@/components/navigation/primary-nav";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TightCRM",
+  title: "Tight Analytics",
   description: "Product Analytics Platform",
 };
 
