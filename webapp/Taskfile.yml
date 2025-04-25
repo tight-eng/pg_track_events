@@ -1,0 +1,31 @@
+version: "3"
+
+dotenv: [".env.local"]
+
+tasks:
+  up:
+    deps: [webapp, ngrok]
+  build:
+    cmds:
+      - yarn install
+      - yarn run build
+
+  lint:
+    cmds:
+      - yarn run lint
+
+  webapp:
+    dir: packages/webapp
+    cmds:
+      - yarn dev
+    method: none
+
+  ngrok:
+    cmds:
+      - |
+        if [ -n "{{.NGROK_DOMAIN}}" ]; then
+          ngrok http 3000 --url {{.NGROK_DOMAIN}} --log=stderr --log-level=error
+        else
+          echo "NGROK_DOMAIN not set, skipping ngrok"
+        fi
+    method: none
