@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Play, Pause } from "lucide-react";
+import Image from "next/image";
 
 // Mock event data
 const mockEvents = [
@@ -67,12 +68,22 @@ const mockEvents = [
     },
   },
   {
-    seconds: 91,
+    seconds: 93,
     from: "RUBY BACKEND",
     event: "REPOSITORY_CREATED",
     properties: {
       orgName: "funorgforrepo",
       repoName: "new-repo",
+    },
+  },
+  {
+    seconds: 99,
+    from: "RUBY BACKEND",
+    event: "ISSUE_CREATED",
+    properties: {
+      orgName: "funorgforrepo",
+      repoName: "new-repo",
+      issueTitle: "new issue",
     },
   },
 ];
@@ -274,7 +285,26 @@ export default function SessionsPage() {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-medium">{event.event}</p>
+                      <div className="flex items-center gap-2">
+                        {event.from === "RUBY BACKEND" ? (
+                          <Image
+                            src="/ruby_logo.png"
+                            alt="Ruby"
+                            width={16}
+                            height={16}
+                            className="rounded-full"
+                          />
+                        ) : event.from === "CHROME" ? (
+                          <Image
+                            src="/chrome_logo.png"
+                            alt="Chrome"
+                            width={16}
+                            height={16}
+                            className="rounded-full"
+                          />
+                        ) : null}
+                        <p className="font-medium">{event.event}</p>
+                      </div>
                       <p className="text-sm text-gray-600">
                         {JSON.stringify(event.properties)}
                       </p>
