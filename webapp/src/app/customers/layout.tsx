@@ -4,56 +4,50 @@ import { SectionLayout } from "@/components/layouts/section-layout";
 
 const customerItems = [
   {
-    id: "segments-folder",
-    title: "Customer Segments",
-    href: "/customers/segments",
+    id: "trials-folder",
+    title: "Trials",
+    href: "/customers/trials",
     type: "folder" as const,
     items: [
       {
-        id: "active-segments",
-        title: "Active Segments",
-        href: "/customers/segments/active",
+        id: "active-trials",
+        title: "Active Trials",
+        href: "/customers/trials/active",
         type: "view" as const,
       },
       {
-        id: "segment-builder",
-        title: "Segment Builder",
-        href: "/customers/segments/builder",
+        id: "failed-trials",
+        title: "Failed Trials",
+        href: "/customers/trials/failed",
         type: "view" as const,
       },
     ],
   },
   {
-    id: "journey-folder",
-    title: "Customer Journey",
-    href: "/customers/journey",
+    id: "customers-folder",
+    title: "Customers",
+    href: "/customers/list",
     type: "folder" as const,
     items: [
       {
-        id: "journey-map",
-        title: "Journey Map",
-        href: "/customers/journey/map",
+        id: "active-customers",
+        title: "Active Customers",
+        href: "/customers/list/active",
         type: "view" as const,
       },
       {
-        id: "touchpoints",
-        title: "Touchpoints",
-        href: "/customers/journey/touchpoints",
+        id: "churned-customers",
+        title: "Churned Customers",
+        href: "/customers/list/churned",
+        type: "view" as const,
+      },
+      {
+        id: "top-20",
+        title: "Top 20",
+        href: "/customers/list/top-20",
         type: "view" as const,
       },
     ],
-  },
-  {
-    id: "all-customers",
-    title: "All Customers",
-    href: "/customers",
-    type: "view" as const,
-  },
-  {
-    id: "profiles",
-    title: "Customer Profiles",
-    href: "/customers/profiles",
-    type: "view" as const,
   },
 ];
 
@@ -67,6 +61,7 @@ export default function CustomersLayout({
       secondaryNavItems={customerItems}
       onCreateFolder={() => console.log("Create customer folder")}
       onCreateView={() => console.log("Create customer view")}
+      defaultSelection={"/customers/list/top-20"}
     >
       {children}
     </SectionLayout>

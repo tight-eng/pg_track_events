@@ -25,17 +25,25 @@ interface SecondaryNavProps {
   items: NavItem[];
   onCreateFolder: () => void;
   onCreateView: () => void;
+  defaultSelection?: string;
 }
 
 export function SecondaryNav({
   items,
   onCreateFolder,
   onCreateView,
+  defaultSelection,
 }: SecondaryNavProps) {
   const pathname = usePathname();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    new Set()
+    new Set(
+      items.filter((item) => item.type === "folder").map((item) => item.id)
+    )
   );
+
+  const getActivePath = () => {
+    return defaultSelection || pathname;
+  };
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
@@ -50,7 +58,7 @@ export function SecondaryNav({
   };
 
   const renderItem = (item: NavItem) => {
-    const isActive = pathname === item.href;
+    const isActive = getActivePath() === item.href;
     const isFolder = item.type === "folder";
     const isOpen = expandedFolders.has(item.id);
 
@@ -76,8 +84,8 @@ export function SecondaryNav({
           <Link
             href={item.href}
             className={cn(
-              "flex-1 px-2 py-1 text-xs hover:bg-[#e8e6e3] hover:rounded-md transition-colors",
-              isActive && "bg-[#e8e6e3] rounded-md"
+              "flex-1 px-2 py-1 text-xs hover:bg-[#e8e6e3] mr-2 hover:rounded-md  transition-colors",
+              isActive && "bg-[#e8e6e3] rounded-md "
             )}
           >
             <span
@@ -88,7 +96,7 @@ export function SecondaryNav({
           </Link>
         </div>
         {isFolder && item.items && isOpen && (
-          <div className="ml-4 mt-1">
+          <div className="ml-2 mt-1">
             {item.items.map((child) => renderItem(child))}
           </div>
         )}

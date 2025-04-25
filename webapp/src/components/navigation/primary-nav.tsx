@@ -87,7 +87,7 @@ export function PrimaryNav() {
                 </TooltipTrigger>
                 <TooltipContent
                   side="right"
-                  className="bg-[#f8f6f3] text-[#2a2a2a] border-[#e8e6e3]"
+                  className="bg-white text-[#2a2a2a] border-[#e8e6e3] shadow-md"
                 >
                   <p>{item.name}</p>
                 </TooltipContent>
@@ -120,7 +120,7 @@ export function PrimaryNav() {
             </TooltipTrigger>
             <TooltipContent
               side="right"
-              className="bg-[#f8f6f3] text-[#2a2a2a] border-[#e8e6e3]"
+              className="bg-white text-[#2a2a2a] border-[#e8e6e3] shadow-md"
             >
               <p>Settings</p>
             </TooltipContent>
