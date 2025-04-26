@@ -12,7 +12,7 @@ program
 
 program
   .command("init")
-  .option("--append-migration-file [file]", "append migration file")
+  // .option("--append-migration-file [file]", "append migration file")
   .option("--reset", "drop analytics schema and reinitialize")
   .description("Test command that returns hello world")
   .action(async (options) => {

@@ -1,5 +1,6 @@
 import { SQL } from "bun";
 import ora from "ora";
+import crypto from "crypto";
 
 //constants
 const schemaName: string = "tight_analytics" as const;
@@ -102,8 +103,71 @@ export async function init(
 
   console.log("\n✨ All triggers created successfully");
 
-  if (dryRun) {
-    console.log("Dry run enabled");
+  // Create the tight_analytics_agent role
+  console.log("\nCreating tight_analytics_agent role:");
+  const spinnerRole = ora(`Creating tight_analytics_agent role`).start();
+
+  try {
+    // Generate a secure random password using Bun's crypto module
+    const password = Buffer.from(crypto.getRandomValues(new Uint8Array(32)))
+      .toString("base64")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 32);
+
+    // Execute the SQL with the password parameter
+    await sql.unsafe(`
+      DO $$
+      DECLARE
+          password text := '${password}';
+      BEGIN
+         -- Create the role if it doesn't already exist, or alter it if it does
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tight_analytics_agent') THEN
+            EXECUTE 'CREATE ROLE tight_analytics_agent LOGIN PASSWORD ' || quote_literal(password);
+         ELSE
+            EXECUTE 'ALTER ROLE tight_analytics_agent WITH PASSWORD ' || quote_literal(password);
+         END IF;
+
+         -- Grant permissions to the user
+         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO tight_analytics_agent';
+
+         -- Public schema permissions
+         GRANT USAGE ON SCHEMA public TO tight_analytics_agent;
+         GRANT SELECT ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO tight_analytics_agent;
+         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO tight_analytics_agent;
+
+         -- Tight analytics schema permissions
+         GRANT USAGE ON SCHEMA tight_analytics TO tight_analytics_agent;
+         GRANT SELECT, INSERT ON tight_analytics.event_log TO tight_analytics_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA tight_analytics GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tight_analytics_agent;
+      END $$;
+    `);
+
+    spinnerRole.succeed(
+      `Created a limited access tight_analytics_agent role with a random password`
+    );
+    console.log("\nIMPORTANT: Save this password for your analytics agent:");
+
+    console.log(
+      "\n\n\nPaste this connection url to the Tight to finish cloud set up:\n"
+    );
+
+    // Extract the host part from the database URL (everything after the @ symbol)
+    const databaseHost = databaseUrl.includes("@")
+      ? databaseUrl.split("@")[1]
+      : databaseUrl;
+
+    // Construct the connection string with the extracted host
+    const connectionString = `postgresql://tight_analytics_agent:${password}@${databaseHost}`;
+    console.log(connectionString);
+
+    return;
+  } catch (error: any) {
+    spinnerRole.fail(
+      `Failed to create tight_analytics_agent role: ${error.message}`
+    );
+    console.error(error);
   }
 }
 
@@ -146,4 +210,25 @@ export async function addTriggersForNewTables(sql: SQL) {
   }
 
   console.log("\n✨ All triggers checked and created successfully");
+
+  // Check if the tight_analytics_agent role exists
+  console.log("\nChecking if tight_analytics_agent role exists:");
+
+  const spinner = ora(`Checking tight_analytics_agent role`).start();
+
+  const roleExists = await sql`
+    SELECT 1 FROM pg_roles WHERE rolname = 'tight_analytics_agent'
+  `;
+
+  if (roleExists.length === 0) {
+    spinner.info(
+      `Role 'tight_analytics_agent' does not exist. Creating it now...`
+    );
+
+    const password = "passs123";
+    await sql.file("./sql_functions/create_user.sql", [password]);
+    spinner.succeed(`Created 'tight_analytics_agent' role successfully`);
+  } else {
+    spinner.succeed(`Role 'tight_analytics_agent' already exists`);
+  }
 }
