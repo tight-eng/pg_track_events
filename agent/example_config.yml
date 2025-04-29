@@ -1,0 +1,29 @@
+track:
+  user.insert:
+    event: "user_signup"
+    properties:
+      email: "new.email"
+      name: "new.name"
+  
+  user.update:
+    event: "user_updated"
+    properties:
+      email: "new.email"
+      name: "new.name"
+
+  invitation.update:
+    cond: "old.status != new.status"
+    "declined_invite":
+      properties:
+        inviter: "invitation.inviter_id"
+    "joined_org":
+      properties:
+        org_id: "invitation.org_id"
+
+destinations:
+  posthog:
+    apiKey: "$POSTHOG_API_KEY"
+    filter: "*"
+  mixpanel:
+    apiKey: "static_api_key_here"
+    filter: "user_*"
