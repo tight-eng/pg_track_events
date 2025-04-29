@@ -1,0 +1,41 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <script src="wasm_exec.js"></script>
+    <script>
+        console.log("Starting go env")
+        const go = new Go();
+        if (!WebAssembly.instantiateStreaming) { // polyfill
+            console.log("Setting up polyfill")
+            WebAssembly.instantiateStreaming = async (resp, importObject) => {
+                const source = await (await resp).arrayBuffer();
+                return await WebAssembly.instantiate(source, importObject);
+            };
+            console.log("Polyfill set")
+        }
+        console.log("Loading wasm lib")
+        WebAssembly.instantiateStreaming(fetch("bin.wasm"), go.importObject).then((result) => {
+            console.log(result)
+            go.run(result.instance);
+
+            console.log('Calling wasm func')
+            const wasmValidateResult = wasmlibValidateCELs({
+                schema: 'todo',
+                cels: [
+                    {
+                        table: 'user',
+                        operation: 'insert',
+                        exprKind: 'prop',
+                        expr: 'new.email'
+                    }
+                ]
+            })
+            console.log('Done with wasm func: ', wasmValidateResult)
+        });
+    </script>
+</head>
+
+<body></body>
+
+</html>

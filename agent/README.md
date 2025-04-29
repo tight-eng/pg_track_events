@@ -31,6 +31,15 @@ Run the agent:
 go run main.go
 ```
 
+### Build WASM lib
+
+```bash
+GOOS=js GOARCH=wasm go build -o bin/wasmlib/bin.wasm ./pkg/wasmlib/main.go
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" bin/wasmlib
+```
+
+To test out the built wasm, serve the directory with `npx http-server`
+
 ## Stopping the Agent
 
-The agent will gracefully shut down when it receives a SIGINT or SIGTERM signal. 
+The agent will gracefully shut down when it receives a SIGINT or SIGTERM signal.

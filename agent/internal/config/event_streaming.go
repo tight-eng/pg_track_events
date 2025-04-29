@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
-	"github.com/typeeng/tight-agent/internal/celutils"
+	"github.com/typeeng/tight-agent/pkg/celutils"
 	"gopkg.in/yaml.v3"
 )
 
