@@ -2,6 +2,7 @@ track:
   user.insert:
     event: "user_signup"
     properties:
+      id: "user.id"
       email: "new.email"
       name: "new.name"
   

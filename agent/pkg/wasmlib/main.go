@@ -74,16 +74,19 @@ func (validator *CELValidator) RunValidation(schema any) {
 		if err != nil {
 			validator.Valid = false
 			validator.Error = fmt.Sprintf("%v", err)
+			return
 		}
 	} else if validator.ExprKind == "prop" {
 		_, err := celutils.CompilePropertyExpression(validator.Expr, env)
 		if err != nil {
 			validator.Valid = false
 			validator.Error = fmt.Sprintf("%v", err)
+			return
 		}
 	} else {
 		validator.Valid = false
 		validator.Error = fmt.Sprintf("invalid expression kind: %v", validator.ExprKind)
+		return
 	}
 	validator.Valid = true
 	validator.Error = ""
