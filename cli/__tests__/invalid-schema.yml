@@ -1,0 +1,7 @@
+# Mapping from Table Changes to Analytics Events
+# Documentation: https://
+track:
+  users.insert:
+    properties:
+      email: "user.email"
+      name: "user.name"
