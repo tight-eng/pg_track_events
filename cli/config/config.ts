@@ -2,6 +2,7 @@ import { parse, parseDocument, stringify } from "yaml";
 import { analyticsConfigSchema } from "./yaml-schema";
 import { z } from "zod";
 import kleur from 'kleur';
+import { initWasm } from './wasm';
 
 type ParseConfigError = {
   message: string;
@@ -13,24 +14,22 @@ type ParseConfigError = {
 export async function parseConfigFile(
   filePath: string
 ): Promise<{ data: z.infer<typeof analyticsConfigSchema>; error: undefined } | { data: undefined; error: ParseConfigError[] }> {
+  
   const fileContentsPromise = Bun.file(filePath).text();
 
   try {
     const fileContents = await fileContentsPromise;
     const parsedYaml = parse(fileContents);
 
-
-    const celValidation = verifyCELExpressions(parsedYaml)
+    const celValidation = await verifyCELExpressions(parsedYaml)
 
     if (celValidation.invalidCount > 0) {
-
       const fileContents = await fileContentsPromise;
       const lines = fileContents.split("\n");
       const errors: ParseConfigError[] = [];
       const document = parseDocument(fileContents);
 
       for (const expr of celValidation.invalid) {
-
         const node = document.getIn(expr.path)!;
         const yamlNode = node as { range?: [number, number] };
         const startChar = yamlNode.range?.[0];
@@ -49,8 +48,6 @@ export async function parseConfigFile(
 
       return { data: undefined, error: errors };
     }
-
-
 
     // Validate against schema
     return { data: analyticsConfigSchema.parse(parsedYaml), error: undefined };
@@ -109,24 +106,22 @@ export async function parseConfigFile(
   }
 }
 
-export function verifyCELExpressions(config: z.infer<typeof analyticsConfigSchema>, introspectedSchema = {}) {
-
-  const validations: ({path: string[], error: string | undefined})[] = []
-
-  function validate(expression: string): {valid: boolean, error: string | undefined} {
-    if (expression.includes('user.name')) {
-      return {valid: true, error: undefined}
-    }
-    return {valid: false, error: 'Invalid CEL expression'}
-  }
+export async function verifyCELExpressions(config: z.infer<typeof analyticsConfigSchema>, introspectedSchema = {}) {
+  const wasmlibValidateCELs = await initWasm();
+  const pendingValidations: ({path: string[], exprKind: 'prop' | 'cond', table: string, operation: 'insert' | 'update' | 'delete', expr: string})[] = []
 
   Object.entries(config.track).forEach(([tablePath, eventConfig]) => {
+
+    // Split tablePath into table and operation (e.g. "users.insert" -> ["users", "insert"])
+    const [table, operation] = tablePath.split('.') as [string, 'insert' | 'update' | 'delete'];
+
+
     // Handle conditional events
     if ('cond' in eventConfig) {
       // Verify the condition expression
       const condExpr = eventConfig.cond;
 
-      validations.push({path: [tablePath, 'cond'], error: validate(condExpr).error}) 
+      pendingValidations.push({path: [tablePath, 'cond'], exprKind: 'cond', table: table, operation: operation, expr: condExpr}) 
       
       // Iterate through each event's properties
       Object.entries(eventConfig).forEach(([key, value]) => {
@@ -136,7 +131,7 @@ export function verifyCELExpressions(config: z.infer<typeof analyticsConfigSchem
             // Full path as array: [tablePath, eventName, propPath]
             const fullPath = [tablePath, key, propPath];
 
-            validations.push({path: fullPath, error: validate(propExpr).error})
+            pendingValidations.push({path: fullPath, exprKind: 'prop', table: table, operation: operation, expr: propExpr})
           });
         }
       });
@@ -148,21 +143,30 @@ export function verifyCELExpressions(config: z.infer<typeof analyticsConfigSchem
         Object.entries(eventConfig.properties).forEach(([propPath, propExpr]) => {
           // Full path as array: [tablePath, 'properties', propPath]
           const fullPath = [tablePath, 'properties', propPath];
-          validations.push({path: fullPath, error: validate(propExpr).error})
+          pendingValidations.push({path: fullPath, exprKind: 'prop', table: table, operation: operation, expr: propExpr})
         });
       }
     }
   });
 
-  const valid =  validations.filter(({error}) => error === undefined)
-  const invalid = validations.filter(({error}) => error !== undefined)  
+
+  const result = await wasmlibValidateCELs({
+    schema: 'todo',
+    cels: pendingValidations
+  })  
+
+
+
+  const invalid = pendingValidations.map((i, index) => {
+    return {...i, valid: result[index].valid, validationError: result[index].validationError}
+  }).filter(({valid}) => !valid)
 
 
   return {
-    invalid,
-    validCount: valid.length, 
     invalidCount: invalid.length,
-    total: validations.length
+    validCount: pendingValidations.length - invalid.length,
+    total: pendingValidations.length,
+    invalid,
   }
 }
 

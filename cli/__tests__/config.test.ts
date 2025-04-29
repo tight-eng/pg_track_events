@@ -1,6 +1,7 @@
 import { expect, test, describe } from "bun:test";
 import { parse, stringify } from "yaml";
 import { parseConfigFile, verifyCELExpressions } from "../config/config";
+import { initWasm } from "../config/wasm";
 
 
 describe("verify yaml", () => {
@@ -57,41 +58,22 @@ test("throws zod validation when invalid schema", async () => {
 })
 
 describe("verify CEL values", () => {
+
+  test('wasm can be initialized', async () => {
+    const wasmlibValidateCELs = await initWasm();
+    expect(wasmlibValidateCELs).toBeDefined();
+  })
+
   test("can verify CEL values", async   () => {
     const fileContentsPromise = Bun.file(__dirname + "/example.yml").text();
     const parsedYaml = parse(await fileContentsPromise);
-    console.log(parsedYaml)
-    const result = verifyCELExpressions(parsedYaml);
+    const result = await verifyCELExpressions(parsedYaml);
     expect(result).toMatchInlineSnapshot(`
       {
-        "invalid": [
-          {
-            "error": "Invalid CEL expression",
-            "path": [
-              "users.insert",
-              "properties",
-              "email",
-            ],
-          },
-          {
-            "error": "Invalid CEL expression",
-            "path": [
-              "invitations.update",
-              "cond",
-            ],
-          },
-          {
-            "error": "Invalid CEL expression",
-            "path": [
-              "invitations.update",
-              "joined_org",
-              "org_id",
-            ],
-          },
-        ],
-        "invalidCount": 3,
+        "invalid": [],
+        "invalidCount": 0,
         "total": 4,
-        "validCount": 1,
+        "validCount": 4,
       }
     `)
   })
