@@ -108,7 +108,7 @@ program
       );
       console.log("\n\n");
       for (const error of config.error) {
-        console.log(error.lines);
+        console.log(error.lines + "\n");
       }
 
       console.log("\n");
