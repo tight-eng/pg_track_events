@@ -10,6 +10,7 @@ import { createAgentUser } from "./create-agent-user";
 import { existsSync } from "fs";
 import { parseConfigFile } from "./config/config";
 import { dropTight } from "./drop";
+import { getIntrospectedSchema } from "./config/introspection";
 const program = new Command();
 
 program
@@ -58,6 +59,10 @@ program
     "manually provide the path to your tight.analytics.yaml"
   )
   .action(async (configYml) => {
+    const [sql] = await getDBConnection();
+
+    const introspectedSchema = await getIntrospectedSchema(sql);
+
     const searchPaths = [
       ...(configYml ? [path.resolve(configYml)] : []),
       path.join(process.cwd(), "tight-analytics", "tight.analytics.yaml"),
@@ -90,7 +95,7 @@ program
     const spinner = ora(
       "Validating mapping from database changes to analytics events..."
     ).start();
-    const config = await parseConfigFile(configPath);
+    const config = await parseConfigFile(configPath, introspectedSchema);
     if (config.data) {
       spinner.succeed(
         kleur.dim(
@@ -114,6 +119,8 @@ program
           }" to check again`
         )
       );
+
+      process.exit(1);
     }
   });
 

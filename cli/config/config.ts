@@ -12,7 +12,8 @@ type ParseConfigError = {
 };
 
 export async function parseConfigFile(
-  filePath: string
+  filePath: string,
+  introspectedSchema: any = {}
 ): Promise<
   | { data: z.infer<typeof analyticsConfigSchema>; error: undefined }
   | { data: undefined; error: ParseConfigError[] }
@@ -204,7 +205,7 @@ export async function verifyCELExpressions(
   });
 
   const result = await wasmlibValidateCELs({
-    schema: "todo",
+    schema: introspectedSchema,
     cels: pendingValidations,
   });
 
