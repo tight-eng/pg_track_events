@@ -23,6 +23,14 @@ type PostgresqlTableSchemaList = schemas.PostgresqlTableSchemaList
 
 type CELValidators []CELValidator
 
+func convertGoStringSliceToJSArray(slice []string) js.Value {
+	jsArray := js.Global().Get("Array").New()
+	for _, item := range slice {
+		jsArray.Call("push", item)
+	}
+	return jsArray
+}
+
 func (validators CELValidators) ToJSValue() js.Value {
 	jsArray := js.Global().Get("Array").New()
 
@@ -32,6 +40,7 @@ func (validators CELValidators) ToJSValue() js.Value {
 		jsMap.Set("operation", v.Operation)
 		jsMap.Set("exprKind", v.ExprKind)
 		jsMap.Set("expr", v.Expr)
+		jsMap.Set("events", convertGoStringSliceToJSArray(v.Events))
 		jsMap.Set("valid", v.Valid)
 		jsMap.Set("validationError", v.Error)
 		jsArray.Call("push", jsMap)
@@ -41,10 +50,11 @@ func (validators CELValidators) ToJSValue() js.Value {
 }
 
 type CELValidator struct {
-	Table     string `json:"table"`
-	Operation string `json:"operation"`
-	ExprKind  string `json:"exprKind"`
-	Expr      string `json:"expr"`
+	Table     string   `json:"table"`
+	Operation string   `json:"operation"`
+	ExprKind  string   `json:"exprKind"`
+	Expr      string   `json:"expr"`
+	Events    []string `json:"events"`
 
 	Valid bool   `json:"valid"`
 	Error string `json:"validationError"`
@@ -73,21 +83,34 @@ func (validator *CELValidator) RunValidation(schemaPb protoreflect.FileDescripto
 		validator.Error = fmt.Sprintf("%v", err)
 		return
 	}
-	env, err := celutils.CreateCELEnv(&schemaPbPkgName, schemaPb, validator.Table, validator.Operation)
-	if err != nil {
-		validator.Valid = false
-		validator.Error = fmt.Sprintf("%v", err)
-		return
-	}
-	if validator.ExprKind == "cond" {
-		_, err := celutils.CompileEventCondition(validator.Expr, env)
+	baseEnvOpts := celutils.GenerateBaseCELEnvOptions(&schemaPbPkgName, schemaPb, validator.Table, validator.Operation)
+	if validator.ExprKind == "prop" {
+		env, err := celutils.CreateCELEnv(baseEnvOpts...)
 		if err != nil {
 			validator.Valid = false
 			validator.Error = fmt.Sprintf("%v", err)
 			return
 		}
-	} else if validator.ExprKind == "prop" {
-		_, err := celutils.CompilePropertyExpression(validator.Expr, env)
+		_, err = celutils.CompilePropertyExpression(env, validator.Expr)
+		if err != nil {
+			validator.Valid = false
+			validator.Error = fmt.Sprintf("%v", err)
+			return
+		}
+	} else if validator.ExprKind == "cond" {
+		eventsEnvOpts, err := celutils.GenerateCELEventsOptions(validator.Events)
+		if err != nil {
+			validator.Valid = false
+			validator.Error = fmt.Sprintf("%v", err)
+			return
+		}
+		env, err := celutils.CreateCELEnv(append(baseEnvOpts, eventsEnvOpts...)...)
+		if err != nil {
+			validator.Valid = false
+			validator.Error = fmt.Sprintf("%v", err)
+			return
+		}
+		_, err = celutils.CompileEventCondition(env, validator.Expr)
 		if err != nil {
 			validator.Valid = false
 			validator.Error = fmt.Sprintf("%v", err)
@@ -100,6 +123,18 @@ func (validator *CELValidator) RunValidation(schemaPb protoreflect.FileDescripto
 	}
 	validator.Valid = true
 	validator.Error = ""
+}
+
+func convertJSArrayToStrings(jsArray js.Value) []string {
+	if !jsArray.Truthy() {
+		return nil
+	}
+	length := jsArray.Length()
+	result := make([]string, length)
+	for i := 0; i < length; i++ {
+		result[i] = jsArray.Index(i).String()
+	}
+	return result
 }
 
 func main() {
@@ -196,6 +231,7 @@ func main() {
 						Operation: cel.Get("operation").String(),
 						ExprKind:  cel.Get("exprKind").String(),
 						Expr:      cel.Get("expr").String(),
+						Events:    convertJSArrayToStrings(cel.Get("events")),
 					}
 					celValidator.RunValidation(currentSchemaPb)
 					celsDest = append(celsDest, celValidator)

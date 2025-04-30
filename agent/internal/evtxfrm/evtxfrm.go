@@ -48,6 +48,8 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig) (*Proce
 		"old":                oldData,
 	}
 
+	// TODO Implement conditional protobufs
+	// TODO Implement properties protobufs
 	switch ec := trackingConfig.EventConfig.(type) {
 	case *config.SimpleEvent:
 		// For simple events, just evaluate the properties

@@ -7,19 +7,19 @@ track:
       name: "user.name"
   
   user.update:
-    event: "user_updated"
-    properties:
-      email: "new.email"
-      name: "new.name"
-
-  # invitation.update:
-  #   cond: "old.status != new.status"
-  #   "declined_invite":
-  #     properties:
-  #       inviter: "invitation.inviter_id"
-  #   "joined_org":
-  #     properties:
-  #       org_id: "invitation.org_id"
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    "user_changed_email":
+      event: "user_changed_email"
+      properties:
+        id: "user.id"
+        previous_email: "old.email"
+        new_email: "new.email"
+    "user_updated":
+      event: "user_updated"
+      properties:
+        id: "user.id"
+        email: "new.email"
+        name: "new.name"
 
 destinations:
   posthog:

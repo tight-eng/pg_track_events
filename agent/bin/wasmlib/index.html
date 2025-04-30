@@ -49,14 +49,23 @@
                             table: 'user',
                             operation: 'insert',
                             exprKind: 'cond',
-                            expr: 'user.email == "test@test.com"'
+                            expr: 'user.email == "test@test.com"',
+                            events: ['user_changed_email', 'user_updated']
                         },
                         {
                             table: 'user',
                             operation: 'insert',
                             exprKind: 'cond',
-                            expr: '17-5'
-                        }
+                            expr: '17-5',
+                            events: []
+                        },
+                        {
+                            table: 'user',
+                            operation: 'update',
+                            exprKind: 'cond',
+                            expr: 'old.email != new.email ? events.user_changed_email : events.user_updated',
+                            events: ['user_changed_email', 'user_updated']
+                        },
                     ]
                 })
                 console.log('Validation result: ', wasmValidateResult)

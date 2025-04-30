@@ -32,6 +32,14 @@ type ConditionalEvent struct {
 	} `yaml:",inline"`
 }
 
+func (ce *ConditionalEvent) GetEventNames() []string {
+	events := make([]string, 0, len(ce.Events))
+	for eventName := range ce.Events {
+		events = append(events, eventName)
+	}
+	return events
+}
+
 // EventConfig is an interface that both SimpleEvent and ConditionalEvent implement
 type EventConfig interface {
 	isEventConfig()
@@ -96,10 +104,10 @@ type EventStreamingConfig struct {
 }
 
 // compileProperties compiles CEL expressions for a map of properties
-func compileProperties(properties map[string]string, env *cel.Env) (map[string]cel.Program, error) {
+func compileProperties(env *cel.Env, properties map[string]string) (map[string]cel.Program, error) {
 	compiled := make(map[string]cel.Program)
 	for key, expr := range properties {
-		prg, err := celutils.CompilePropertyExpression(expr, env)
+		prg, err := celutils.CompilePropertyExpression(env, expr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile property '%s': %w", key, err)
 		}
@@ -121,30 +129,39 @@ func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.Fi
 		eventType := matches[2]
 
 		// Create CEL environment for this table and event type
-		env, err := celutils.CreateCELEnv(pbPkgName, pbFd, tableName, eventType)
-		if err != nil {
-			return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
-		}
+		baseEnvOpts := celutils.GenerateBaseCELEnvOptions(pbPkgName, pbFd, tableName, eventType)
 
 		// Compile CEL expressions based on event type
 		switch ec := eventConfig.EventConfig.(type) {
 		case *SimpleEvent:
+			env, err := celutils.CreateCELEnv(baseEnvOpts...)
+			if err != nil {
+				return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
+			}
 			// Compile properties for SimpleEvent
-			ec.CompiledProperties, err = compileProperties(ec.Properties, env)
+			ec.CompiledProperties, err = compileProperties(env, ec.Properties)
 			if err != nil {
 				return fmt.Errorf("failed to compile properties for %s: %w", key, err)
 			}
 
 		case *ConditionalEvent:
+			eventsEnvOpts, err := celutils.GenerateCELEventsOptions(ec.GetEventNames())
+			if err != nil {
+				return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
+			}
+			env, err := celutils.CreateCELEnv(append(baseEnvOpts, eventsEnvOpts...)...)
+			if err != nil {
+				return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
+			}
 			// Compile condition
-			ec.CompiledCond, err = celutils.CompileEventCondition(ec.Cond, env)
+			ec.CompiledCond, err = celutils.CompileEventCondition(env, ec.Cond)
 			if err != nil {
 				return fmt.Errorf("failed to compile condition for %s: %w", key, err)
 			}
 
 			// Compile properties for each event in ConditionalEvent
 			for eventName, event := range ec.Events {
-				event.CompiledProperties, err = compileProperties(event.Properties, env)
+				event.CompiledProperties, err = compileProperties(env, event.Properties)
 				if err != nil {
 					return fmt.Errorf("failed to compile properties for %s.%s: %w", key, eventName, err)
 				}
