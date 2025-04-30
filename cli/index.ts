@@ -9,6 +9,7 @@ import kleur from "kleur";
 import { createAgentUser } from "./create-agent-user";
 import { existsSync } from "fs";
 import { parseConfigFile } from "./config/config";
+import { dropTight } from "./drop";
 const program = new Command();
 
 program
@@ -116,6 +117,45 @@ program
     }
   });
 
+program
+  .command("drop")
+  .description(
+    "Drop all Tight Analytics database objects (triggers, tables, roles)"
+  )
+  .action(async () => {
+    console.log(
+      kleur.yellow(
+        "\n⚠️  WARNING: This will remove all Tight Analytics components from your database"
+      )
+    );
+    console.log(
+      kleur.dim(
+        "\nThis includes:\n" +
+          "- All database triggers\n" +
+          "- The tight_analytics schema\n" +
+          "- The event_log table\n" +
+          "- The tight_analytics_agent user role\n"
+      )
+    );
+    console.log(
+      kleur.red(
+        "\n🚨 IMPORTANT: This operation may fail if you have active agents running in production.\n" +
+          "Please disable all agents before proceeding."
+      )
+    );
+
+    const confirmation = await prompts({
+      type: "text",
+      name: "confirm",
+      message:
+        "Type 'confirm' to proceed with dropping all Tight Analytics components",
+    });
+
+    const [sql] = await getDBConnection();
+
+    await dropTight(sql);
+  });
+
 program.parse();
 
 // Shared helpers
@@ -141,5 +181,13 @@ async function getDBConnection(additionalPrompt: string = "") {
 
   spinner.succeed(kleur.dim("Connected to database"));
 
-  return [new SQL(DATABASE_URL), DATABASE_URL];
+  try {
+    return [new SQL(DATABASE_URL), DATABASE_URL];
+  } catch (error) {
+    spinner.fail(kleur.red("Failed to connect to database"));
+    console.error(
+      kleur.dim(error instanceof Error ? error.message : String(error))
+    );
+    process.exit(1);
+  }
 }
