@@ -20,9 +20,12 @@ const (
 	defaultBatchSize     = 100
 	defaultFetchInterval = 5 * time.Second
 
-	schemaNameEnvKey                = "TIGHT_SCHEMA_NAME"
+	defaultSchemaNameEnvKey = "TIGHT_DEFAULT_SCHEMA_NAME"
+	defaultSchemaName       = "public"
+
+	internalSchemaNameEnvKey        = "TIGHT_INTERNAL_SCHEMA_NAME"
 	eventLogTableNameEnvKey         = "TIGHT_EVENT_LOG_TABLE_NAME"
-	defaultSchemaName               = "tight_analytics"
+	defaultInternalSchemaName       = "tight_analytics"
 	defaultEventLogTableName        = "event_log"
 	defaultEventStreamingConfigPath = "config.yml"
 )
@@ -33,7 +36,8 @@ type AgentConfig struct {
 	APIKey               string
 	BatchSize            int
 	FetchInterval        time.Duration
-	SchemaName           string
+	DefaultSchemaName    string
+	InternalSchemaName   string
 	EventLogTableName    string
 	EventStreamingConfig *EventStreamingConfig
 }
@@ -70,7 +74,8 @@ func getDefaultConfig() *AgentConfig {
 		APIBaseURL:           defaultAPIBaseURL,
 		BatchSize:            defaultBatchSize,
 		FetchInterval:        defaultFetchInterval,
-		SchemaName:           defaultSchemaName,
+		DefaultSchemaName:    defaultSchemaName,
+		InternalSchemaName:   defaultInternalSchemaName,
 		EventLogTableName:    defaultEventLogTableName,
 		EventStreamingConfig: &EventStreamingConfig{},
 	}
@@ -100,7 +105,8 @@ func getDefaultConfig() *AgentConfig {
 		}
 	}
 
-	cfg.SchemaName = env.FirstOrDefault(cfg.SchemaName, schemaNameEnvKey)
+	cfg.DefaultSchemaName = env.FirstOrDefault(cfg.DefaultSchemaName, defaultSchemaNameEnvKey)
+	cfg.InternalSchemaName = env.FirstOrDefault(cfg.InternalSchemaName, internalSchemaNameEnvKey)
 	cfg.EventLogTableName = env.FirstOrDefault(cfg.EventLogTableName, eventLogTableNameEnvKey)
 
 	cfg.EventStreamingConfig, err = ParseEventStreamingConfig(env.FirstOrDefault(defaultEventStreamingConfigPath, eventStreamingConfigPathEnvKey))

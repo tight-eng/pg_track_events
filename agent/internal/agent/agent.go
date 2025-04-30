@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,12 +11,19 @@ import (
 	"github.com/typeeng/tight-agent/internal/db"
 	"github.com/typeeng/tight-agent/internal/evtxfrm"
 	"github.com/typeeng/tight-agent/internal/logger"
+	"github.com/typeeng/tight-agent/pkg/schemas"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type Agent struct {
-	db     *sql.DB
-	cfg    *config.AgentConfig
-	logger *slog.Logger
+	db                 *sql.DB
+	cfg                *config.AgentConfig
+	logger             *slog.Logger
+	schema             schemas.PostgresqlTableSchemaList
+	schemaPbDescriptor protoreflect.FileDescriptor
+	schemaPbPkgName    *string
+	strictSchema       bool
 }
 
 func NewAgent(ctx context.Context, db *sql.DB) *Agent {
@@ -25,9 +31,11 @@ func NewAgent(ctx context.Context, db *sql.DB) *Agent {
 	logger := logger.Logger()
 
 	return &Agent{
-		db:     db,
-		cfg:    cfg,
-		logger: logger,
+		db:              db,
+		cfg:             cfg,
+		logger:          logger,
+		schemaPbPkgName: proto.String("db"),
+		strictSchema:    true,
 	}
 }
 
@@ -38,19 +46,37 @@ func (a *Agent) Start(ctx context.Context) error {
 
 	a.logger.Info("starting event processing agent",
 		"batch_size", a.cfg.BatchSize,
-		"interval", a.cfg.FetchInterval)
+		"interval", a.cfg.FetchInterval,
+		"schema_name", a.cfg.InternalSchemaName,
+		"strict_schema", a.strictSchema,
+	)
 
-	schema, err := db.GetSchema(ctx, a.db)
-	if err != nil {
-		a.logger.Error("failed to get schema", "error", err)
-		return err
+	// TODO Monitor for schema changes
+	if a.strictSchema {
+		a.logger.Info("fetching schema")
+		if a.schemaPbPkgName == nil {
+			return fmt.Errorf("schema package name not set")
+		}
+		var err error
+		a.schema, err = db.GetSchema(ctx, a.db)
+		if err != nil {
+			a.logger.Error("failed to get schema", "error", err)
+			return err
+		}
+
+		a.schemaPbDescriptor, err = a.schema.GeneratePbDescriptorForTables(*a.schemaPbPkgName, fmt.Sprintf("%s.*", a.cfg.DefaultSchemaName))
+		if err != nil {
+			a.logger.Error("failed to generate protobuf descriptor", "error", err)
+			return err
+		}
+
+		a.logger.Info("validating event streaming config against schema", "schema", a.schemaPbDescriptor)
+
+		if err := a.cfg.EventStreamingConfig.Validate(a.schemaPbPkgName, a.schemaPbDescriptor); err != nil {
+			a.logger.Error("failed to validate event streaming config against schema", "error", err)
+			return err
+		}
 	}
-	schemaJSON, err := json.Marshal(schema)
-	if err != nil {
-		a.logger.Error("failed to marshal schema", "error", err)
-		return err
-	}
-	fmt.Println(string(schemaJSON))
 
 	for {
 		select {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/pkg/celutils"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"gopkg.in/yaml.v3"
 )
 
@@ -108,7 +109,7 @@ func compileProperties(properties map[string]string, env *cel.Env) (map[string]c
 }
 
 // Validate performs validation on the entire configuration
-func (ac *EventStreamingConfig) Validate() error {
+func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.FileDescriptor) error {
 	// Validate tracking configuration
 	tablePattern := regexp.MustCompile(`^([a-zA-Z0-9_]+)\.(insert|update|delete)$`)
 	for key, eventConfig := range ac.Track {
@@ -120,7 +121,7 @@ func (ac *EventStreamingConfig) Validate() error {
 		eventType := matches[2]
 
 		// Create CEL environment for this table and event type
-		env, err := celutils.CreateCELEnv(tableName, eventType)
+		env, err := celutils.CreateCELEnv(pbPkgName, pbFd, tableName, eventType)
 		if err != nil {
 			return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
 		}
@@ -174,7 +175,7 @@ func ParseEventStreamingConfig(path string) (*EventStreamingConfig, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	if err := config.Validate(); err != nil {
+	if err := config.Validate(nil, nil); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 

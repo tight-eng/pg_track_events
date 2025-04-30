@@ -4,11 +4,22 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"syscall/js"
 
 	"github.com/typeeng/tight-agent/pkg/celutils"
+	"github.com/typeeng/tight-agent/pkg/schemas"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
+
+var (
+	defaultSchemaGlob = "public.*"
+	schemaPbPkgName   = "db"
+)
+
+type PostgresqlTableSchema = schemas.PostgresqlTableSchema
+type PostgresqlTableSchemaList = schemas.PostgresqlTableSchemaList
 
 type CELValidators []CELValidator
 
@@ -55,14 +66,14 @@ func (validator *CELValidator) CheckInput() error {
 	return nil
 }
 
-func (validator *CELValidator) RunValidation(schema any) {
+func (validator *CELValidator) RunValidation(schemaPb protoreflect.FileDescriptor) {
 	err := validator.CheckInput()
 	if err != nil {
 		validator.Valid = false
 		validator.Error = fmt.Sprintf("%v", err)
 		return
 	}
-	env, err := celutils.CreateCELEnv(validator.Table, validator.Operation)
+	env, err := celutils.CreateCELEnv(&schemaPbPkgName, schemaPb, validator.Table, validator.Operation)
 	if err != nil {
 		validator.Valid = false
 		validator.Error = fmt.Sprintf("%v", err)
@@ -95,40 +106,108 @@ func main() {
 	done := make(chan struct{}, 0)
 	global := js.Global()
 
-	// Input: { schema: any, cels: [{ table: string, operation: string, exprKind: string, expr: string }] }
-	global.Set("wasmlibValidateCELs", js.FuncOf(func(this js.Value, args []js.Value) any {
-		if len(args) != 1 {
-			return js.ValueOf("Error: expected exactly one argument")
-		}
+	var currentSchemaPb protoreflect.FileDescriptor
 
-		input := args[0]
-		if !input.Truthy() {
-			return js.ValueOf("Error: input object is required")
-		}
+	// Input: { schema: Array | null }
+	// The schema is a JavaScript array that contains the schema of the database returned by the introspection query
+	global.Set("wasmlibSetSchema", js.FuncOf(func(_ js.Value, outerArgs []js.Value) any {
+		handler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			resolve := args[0]
+			reject := args[1]
 
-		schema := input.Get("schema")
-		cels := input.Get("cels")
+			go func() {
+				if len(outerArgs) != 1 {
+					reject.Invoke(js.Global().Get("Error").New("expected exactly one argument"))
+					return
+				}
 
-		if !cels.Truthy() {
-			return js.ValueOf("Error: cels array is required")
-		}
+				schemaArg := outerArgs[0]
+				if schemaArg.IsNull() {
+					currentSchemaPb = nil
+					resolve.Invoke(js.Null())
+					return
+				}
 
-		celsLen := cels.Length()
-		celsDest := make(CELValidators, 0, celsLen)
+				if !schemaArg.Truthy() {
+					reject.Invoke(js.Global().Get("Error").New("schema is required to be an array or null"))
+					return
+				}
 
-		for i := 0; i < celsLen; i++ {
-			cel := cels.Index(i)
-			celValidator := CELValidator{
-				Table:     cel.Get("table").String(),
-				Operation: cel.Get("operation").String(),
-				ExprKind:  cel.Get("exprKind").String(),
-				Expr:      cel.Get("expr").String(),
-			}
-			celValidator.RunValidation(schema)
-			celsDest = append(celsDest, celValidator)
-		}
+				if schemaArg.Type() != js.TypeObject || !schemaArg.InstanceOf(js.Global().Get("Array")) {
+					reject.Invoke(js.Global().Get("Error").New("schema must be an array"))
+					return
+				}
 
-		return celsDest.ToJSValue()
+				// Convert JS array to Go slice
+				var schemas PostgresqlTableSchemaList
+				schemaArgAsStr := js.Global().Get("JSON").Call("stringify", schemaArg)
+				err := json.Unmarshal([]byte(schemaArgAsStr.String()), &schemas)
+				if err != nil {
+					reject.Invoke(js.Global().Get("Error").New(fmt.Sprintf("failed to parse schema: %v", err)))
+					return
+				}
+
+				currentSchemaPb, err = schemas.GeneratePbDescriptorForTables(schemaPbPkgName, defaultSchemaGlob)
+				if err != nil {
+					reject.Invoke(js.Global().Get("Error").New(fmt.Sprintf("failed to generate protobuf descriptor: %v", err)))
+					return
+				}
+
+				resolve.Invoke(js.Null())
+			}()
+
+			return nil
+		})
+
+		return js.Global().Get("Promise").New(handler)
+	}))
+
+	// Input: { cels: [{ table: string, operation: string, exprKind: string, expr: string }] }
+	global.Set("wasmlibValidateCELs", js.FuncOf(func(_ js.Value, outerArgs []js.Value) any {
+		handler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			resolve := args[0]
+			reject := args[1]
+
+			go func() {
+				if len(outerArgs) != 1 {
+					reject.Invoke(js.Global().Get("Error").New("expected exactly one argument"))
+					return
+				}
+
+				input := outerArgs[0]
+				if !input.Truthy() {
+					reject.Invoke(js.Global().Get("Error").New("input object is required"))
+					return
+				}
+
+				cels := input.Get("cels")
+				if !cels.Truthy() {
+					reject.Invoke(js.Global().Get("Error").New("cels array is required"))
+					return
+				}
+
+				celsLen := cels.Length()
+				celsDest := make(CELValidators, 0, celsLen)
+
+				for i := 0; i < celsLen; i++ {
+					cel := cels.Index(i)
+					celValidator := CELValidator{
+						Table:     cel.Get("table").String(),
+						Operation: cel.Get("operation").String(),
+						ExprKind:  cel.Get("exprKind").String(),
+						Expr:      cel.Get("expr").String(),
+					}
+					celValidator.RunValidation(currentSchemaPb)
+					celsDest = append(celsDest, celValidator)
+				}
+
+				resolve.Invoke(celsDest.ToJSValue())
+			}()
+
+			return nil
+		})
+
+		return js.Global().Get("Promise").New(handler)
 	}))
 	<-done
 }

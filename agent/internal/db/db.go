@@ -53,7 +53,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]DBEvent, *sql.Tx, error) 
 	cfg := config.ConfigFromContext(ctx)
 
 	// Construct the fully qualified table name using schema and table from config
-	tableName := fmt.Sprintf("%s.%s", cfg.SchemaName, cfg.EventLogTableName)
+	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf(`
 		SELECT id, event_type, row_table_name, logged_at, old_row, new_row
@@ -122,7 +122,7 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 	cfg := config.ConfigFromContext(ctx)
 
 	// Construct the fully qualified table name using schema and table from config
-	tableName := fmt.Sprintf("%s.%s", cfg.SchemaName, cfg.EventLogTableName)
+	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ANY($1)", tableName)
 	_, err := tx.ExecContext(ctx, query, eventIDs)
@@ -139,7 +139,7 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 }
 
 // GetSchema retrieves the database schema using the provided SQL query
-func GetSchema(ctx context.Context, db *sql.DB) ([]*schemas.PostgresqlTableSchema, error) {
+func GetSchema(ctx context.Context, db *sql.DB) (schemas.PostgresqlTableSchemaList, error) {
 	// Read the SQL query from the file
 	query, err := os.ReadFile("introspect_pg.sql")
 	if err != nil {
@@ -163,7 +163,7 @@ func GetSchema(ctx context.Context, db *sql.DB) ([]*schemas.PostgresqlTableSchem
 	}
 
 	// Unmarshal the JSON into our schema structs
-	var schemas []*schemas.PostgresqlTableSchema
+	var schemas schemas.PostgresqlTableSchemaList
 	if err := json.Unmarshal([]byte(schemaJSON), &schemas); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal schema JSON: %w", err)
 	}

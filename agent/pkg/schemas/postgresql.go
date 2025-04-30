@@ -16,6 +16,17 @@ limitations under the License.
 
 package schemas
 
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+)
+
 type PostgresqlTableTrigger struct {
 	Name              string   `json:"name" yaml:"name"`
 	ConstraintTrigger *bool    `json:"constraintTrigger" yaml:"constraintTrigger"`
@@ -70,4 +81,93 @@ type PostgresqlTableSchema struct {
 	Columns     []*PostgresqlTableColumn     `json:"columns" yaml:"columns"`
 	IsDeleted   bool                         `json:"isDeleted" yaml:"isDeleted"`
 	Triggers    []*PostgresqlTableTrigger    `json:"triggers" yaml:"triggers"`
+}
+
+type PostgresqlTableSchemaList []*PostgresqlTableSchema
+
+// createFieldDescriptor creates a protobuf field descriptor from a PostgreSQL column
+func (column *PostgresqlTableColumn) createFieldDescriptor(fieldNumber int32) *descriptorpb.FieldDescriptorProto {
+	field := &descriptorpb.FieldDescriptorProto{
+		Name:   proto.String(column.Name),
+		Number: proto.Int32(fieldNumber),
+	}
+
+	// Map PostgreSQL types to protobuf types
+	switch column.Type {
+	case "integer", "bigint", "serial", "bigserial":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()
+	case "text", "varchar", "char", "character varying":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+	case "boolean":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum()
+	case "double precision", "real":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
+	case "timestamp", "timestamptz", "date":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum() // Store as Unix timestamp
+	default:
+		// Default to string for unknown types
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+	}
+
+	// NOTE: Protobuf v3 doesn't support required fields so we don't add those labels
+	//       Learn more: https://stackoverflow.com/questions/31801257/why-required-and-optional-is-removed-in-protocol-buffers-3
+
+	return field
+}
+
+// createMessageDescriptor creates a protobuf message descriptor from a PostgreSQL table
+func (table *PostgresqlTableSchema) createMessageDescriptor() *descriptorpb.DescriptorProto {
+	msgName := table.Name
+	if strings.Contains(msgName, ".") {
+		msgName = strings.SplitN(msgName, ".", 2)[1]
+	}
+	msg := &descriptorpb.DescriptorProto{
+		Name: proto.String(msgName),
+	}
+
+	// Add fields for each column
+	for i, column := range table.Columns {
+		field := column.createFieldDescriptor(int32(i + 1))
+		msg.Field = append(msg.Field, field)
+	}
+
+	return msg
+}
+
+// GeneratePbDescriptorForTables generates protobuf descriptors for all tables matching the given glob pattern
+func (s PostgresqlTableSchemaList) GeneratePbDescriptorForTables(pbPkgName, tableNameGlob string) (protoreflect.FileDescriptor, error) {
+	// Create a new file descriptor proto
+	f := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String(pbPkgName + "_pg_schema.proto"),
+		Syntax:  proto.String("proto3"),
+		Package: proto.String(pbPkgName),
+	}
+
+	// Convert each table to a message descriptor
+	for _, table := range s {
+		// Skip if table is marked as deleted
+		if table.IsDeleted {
+			continue
+		}
+
+		// Check if table name matches the glob pattern
+		matches, err := filepath.Match(tableNameGlob, table.Name)
+		if err != nil {
+			return nil, fmt.Errorf("invalid glob pattern: %w", err)
+		}
+		if !matches {
+			continue
+		}
+
+		msg := table.createMessageDescriptor()
+		f.MessageType = append(f.MessageType, msg)
+	}
+
+	// Create the file descriptor
+	fd, err := protodesc.NewFile(f, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file descriptor: %w", err)
+	}
+
+	return fd, nil
 }

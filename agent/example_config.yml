@@ -4,7 +4,7 @@ track:
     properties:
       id: "user.id"
       email: "new.email"
-      name: "new.name"
+      name: "user.name"
   
   user.update:
     event: "user_updated"
@@ -12,14 +12,14 @@ track:
       email: "new.email"
       name: "new.name"
 
-  invitation.update:
-    cond: "old.status != new.status"
-    "declined_invite":
-      properties:
-        inviter: "invitation.inviter_id"
-    "joined_org":
-      properties:
-        org_id: "invitation.org_id"
+  # invitation.update:
+  #   cond: "old.status != new.status"
+  #   "declined_invite":
+  #     properties:
+  #       inviter: "invitation.inviter_id"
+  #   "joined_org":
+  #     properties:
+  #       org_id: "invitation.org_id"
 
 destinations:
   posthog:

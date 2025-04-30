@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/google/cel-go/cel"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var (
-	newVar = cel.Variable("new", cel.MapType(cel.StringType, cel.DynType))
-	oldVar = cel.Variable("old", cel.MapType(cel.StringType, cel.DynType))
+	newVarDyn = cel.Variable("new", cel.MapType(cel.StringType, cel.DynType))
+	oldVarDyn = cel.Variable("old", cel.MapType(cel.StringType, cel.DynType))
 )
 
 // compileCELExpression compiles a CEL expression with the given environment
@@ -53,11 +54,30 @@ func CompilePropertyExpression(expr string, env *cel.Env) (cel.Program, error) {
 	return compileCELExpression(expr, env)
 }
 
+type UserAgent struct {
+	ID   string `cel:"id"`
+	Name string `cel:"name"`
+}
+
 // CreateCELEnv creates a CEL environment with common declarations
-func CreateCELEnv(tableName string, op string) (*cel.Env, error) {
+func CreateCELEnv(pbPkgName *string, pbFd protoreflect.FileDescriptor, tableName string, op string) (*cel.Env, error) {
 	// Create base declarations
-	envOpts := []cel.EnvOption{
-		cel.Variable(tableName, cel.MapType(cel.StringType, cel.DynType)),
+	var envOpts []cel.EnvOption
+	var newVar, oldVar cel.EnvOption
+	if pbPkgName != nil && pbFd != nil {
+		rowObjType := cel.ObjectType(fmt.Sprintf("%s.%s", *pbPkgName, tableName))
+		envOpts = []cel.EnvOption{
+			cel.TypeDescs(pbFd),
+			cel.Variable(tableName, rowObjType),
+		}
+		newVar = cel.Variable("new", rowObjType)
+		oldVar = cel.Variable("old", rowObjType)
+	} else {
+		envOpts = []cel.EnvOption{
+			cel.Variable(tableName, cel.MapType(cel.StringType, cel.DynType)),
+		}
+		newVar = newVarDyn
+		oldVar = oldVarDyn
 	}
 
 	// Add new/old based on event type

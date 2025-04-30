@@ -15,29 +15,57 @@
             console.log("Polyfill set")
         }
         console.log("Loading wasm lib")
-        WebAssembly.instantiateStreaming(fetch("bin.wasm"), go.importObject).then((result) => {
+        WebAssembly.instantiateStreaming(fetch("bin.wasm"), go.importObject).then(async (result) => {
             console.log(result)
             go.run(result.instance);
 
-            console.log('Calling wasm func')
-            const wasmValidateResult = wasmlibValidateCELs({
-                schema: 'todo',
-                cels: [
-                    {
-                        table: 'user',
-                        operation: 'insert',
-                        exprKind: 'prop',
-                        expr: 'news.email'
-                    },
-                    {
-                        table: 'user',
-                        operation: 'insert',
-                        exprKind: 'cond',
-                        expr: '17-5'
-                    }
-                ]
-            })
-            console.log('Done with wasm func: ', wasmValidateResult)
+            console.log('Calling wasmlib funcs')
+            try {
+                console.log('Setting schema...')
+                await wasmlibSetSchema([{ "name": "public.auth_account", "columns": [{ "name": "user_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "type", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "provider", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "provider_account_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "refresh_token", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "access_token", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "expires_at", "type": "integer", "default": null, "attributes": null, "constraints": null }, { "name": "token_type", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "scope", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "id_token", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "session_state", "type": "text", "default": null, "attributes": null, "constraints": null }], "indexes": null, "triggers": [{ "name": "auth_account_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER auth_account_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.auth_account FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["provider", "provider_account_id"], "foreignKeys": [{ "name": "auth_account_user_id_user_id_fk", "columns": ["user_id"], "onDelete": "CASCADE", "references": { "table": "public.user", "columns": ["id"] } }] }, { "name": "public.auth_authenticator", "columns": [{ "name": "credential_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "user_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "provider_account_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "credential_public_key", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "counter", "type": "integer", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "credential_device_type", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "credential_backed_up", "type": "boolean", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "transports", "type": "text", "default": null, "attributes": null, "constraints": null }], "indexes": [{ "name": "auth_authenticator_credential_id_unique", "type": "btree", "columns": ["credential_id"], "isUnique": true }], "triggers": [{ "name": "auth_authenticator_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER auth_authenticator_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.auth_authenticator FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["user_id", "credential_id"], "foreignKeys": [{ "name": "auth_authenticator_user_id_user_id_fk", "columns": ["user_id"], "onDelete": "CASCADE", "references": { "table": "public.user", "columns": ["id"] } }] }, { "name": "public.auth_verification_token", "columns": [{ "name": "identifier", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "token", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "expires", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }], "indexes": null, "triggers": [{ "name": "auth_verification_token_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER auth_verification_token_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.auth_verification_token FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["identifier", "token"], "foreignKeys": null }, { "name": "public.tenant", "columns": [{ "name": "id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "name", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "slug", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "created_at", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "updated_at", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }], "indexes": [{ "name": "unique_slug_idx", "type": "btree", "columns": ["slug"], "isUnique": true }], "triggers": [{ "name": "tenant_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER tenant_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.tenant FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["id"], "foreignKeys": null }, { "name": "public.user", "columns": [{ "name": "id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "name", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "email", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "email_verified", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": null }, { "name": "image", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "hashed_password", "type": "text", "default": null, "attributes": null, "constraints": null }, { "name": "created_at", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "updated_at", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }], "indexes": [{ "name": "idx_users_email", "type": "btree", "columns": ["email"], "isUnique": false }], "triggers": [{ "name": "user_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER user_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.\"user\" FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["id"], "foreignKeys": null }, { "name": "public.user_tenant", "columns": [{ "name": "user_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "tenant_id", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "role", "type": "text", "default": "'member'::text", "attributes": null, "constraints": { "notNull": true } }, { "name": "created_at", "type": "timestamp without time zone", "default": null, "attributes": null, "constraints": { "notNull": true } }], "indexes": null, "triggers": [{ "name": "user_tenant_audit_trigger", "events": ["INSERT", "DELETE", "UPDATE"], "arguments": [], "condition": null, "forEachRow": true, "executeProcedure": "CREATE TRIGGER user_tenant_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.user_tenant FOR EACH ROW EXECUTE FUNCTION tight_analytics.log_table_changes()", "forEachStatement": false, "constraintTrigger": false }], "isDeleted": false, "primaryKey": ["user_id", "tenant_id"], "foreignKeys": [{ "name": "user_tenant_tenant_id_tenant_id_fk", "columns": ["tenant_id"], "onDelete": "CASCADE", "references": { "table": "public.tenant", "columns": ["id"] } }, { "name": "user_tenant_user_id_user_id_fk", "columns": ["user_id"], "onDelete": "CASCADE", "references": { "table": "public.user", "columns": ["id"] } }] }, { "name": "tight_analytics.event_log", "columns": [{ "name": "id", "type": "bigint", "default": "nextval('tight_analytics.event_log_id_seq'::regclass)", "attributes": { "autoIncrement": true }, "constraints": { "notNull": true } }, { "name": "event_type", "type": "tight_analytics.event_type", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "row_table_name", "type": "text", "default": null, "attributes": null, "constraints": { "notNull": true } }, { "name": "logged_at", "type": "timestamp with time zone", "default": "clock_timestamp()", "attributes": null, "constraints": { "notNull": true } }, { "name": "old_row", "type": "jsonb", "default": null, "attributes": null, "constraints": null }, { "name": "new_row", "type": "jsonb", "default": null, "attributes": null, "constraints": null }], "indexes": null, "triggers": null, "isDeleted": false, "primaryKey": ["id"], "foreignKeys": null }])
+                console.log('Successfully set schema!')
+                console.log('Validating example CELs...')
+                const wasmValidateResult = await wasmlibValidateCELs({
+                    cels: [
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'prop',
+                            expr: 'news.email'
+                        },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'prop',
+                            expr: 'user.email'
+                        },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'prop',
+                            expr: 'user.not_valid_prop'
+                        },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'cond',
+                            expr: 'user.email == "test@test.com"'
+                        },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'cond',
+                            expr: '17-5'
+                        }
+                    ]
+                })
+                console.log('Validation result: ', wasmValidateResult)
+                console.log('Resetting wasmlib schema...')
+                await wasmlibSetSchema(null)
+                console.log('Successfully reset schema!')
+            } catch (e) {
+                console.log('wasmlib error: ', e)
+            }
         });
     </script>
 </head>
