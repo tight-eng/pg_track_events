@@ -47,3 +47,5 @@ next-env.d.ts
 ngrok.yml
 
 cli/wasm
+
+cli/tight-analytics
