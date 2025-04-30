@@ -1,22 +1,14 @@
 import { SQL } from "bun";
 import ora from "ora";
 import crypto from "crypto";
+import { existsSync } from "fs";
+import { mkdirSync } from "fs";
+import kleur from "kleur";
 
 //constants
 const schemaName: string = "tight_analytics" as const;
 
-export async function init(
-  databaseUrl: string,
-  reset: boolean = false,
-  dryRun: boolean = false
-) {
-  const spinner = ora("Connecting to database...").start();
-
-  const sql = new SQL(databaseUrl);
-
-  spinner.succeed("Connected to database");
-  console.log();
-
+export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   // Check if schema exists
   const schemaExists = !!(
     await sql`
@@ -71,7 +63,7 @@ export async function init(
     )
   )`;
 
-  spinnerScheme.succeed("Analytics scheme created");
+  spinnerScheme.succeed(kleur.dim("Analytics scheme created"));
 
   // Get all tables in the public schema
   const result =
@@ -101,74 +93,28 @@ export async function init(
     spinner.succeed(`Created trigger for ${table}`);
   }
 
-  console.log("\n✨ All triggers created successfully");
+  console.log(kleur.dim("\nAll triggers created successfully"));
 
-  // Create the tight_analytics_agent role
-  console.log("\nCreating tight_analytics_agent role:");
-  const spinnerRole = ora(`Creating tight_analytics_agent role`).start();
-
-  try {
-    // Generate a secure random password using Bun's crypto module
-    const password = Buffer.from(crypto.getRandomValues(new Uint8Array(32)))
-      .toString("base64")
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .slice(0, 32);
-
-    // Execute the SQL with the password parameter
-    await sql.unsafe(`
-      DO $$
-      DECLARE
-          password text := '${password}';
-      BEGIN
-         -- Create the role if it doesn't already exist, or alter it if it does
-         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tight_analytics_agent') THEN
-            EXECUTE 'CREATE ROLE tight_analytics_agent LOGIN PASSWORD ' || quote_literal(password);
-         ELSE
-            EXECUTE 'ALTER ROLE tight_analytics_agent WITH PASSWORD ' || quote_literal(password);
-         END IF;
-
-         -- Grant permissions to the user
-         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO tight_analytics_agent';
-
-         -- Public schema permissions
-         GRANT USAGE ON SCHEMA public TO tight_analytics_agent;
-         GRANT SELECT ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO tight_analytics_agent;
-         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO tight_analytics_agent;
-
-         -- Tight analytics schema permissions
-         GRANT USAGE ON SCHEMA tight_analytics TO tight_analytics_agent;
-         GRANT SELECT, INSERT ON tight_analytics.event_log TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA tight_analytics GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tight_analytics_agent;
-      END $$;
-    `);
-
-    spinnerRole.succeed(
-      `Created a limited access tight_analytics_agent role with a random password`
-    );
-    console.log("\nIMPORTANT: Save this password for your analytics agent:");
-
-    console.log(
-      "\n\n\nPaste this connection url to the Tight to finish cloud set up:\n"
-    );
-
-    // Extract the host part from the database URL (everything after the @ symbol)
-    const databaseHost = databaseUrl.includes("@")
-      ? databaseUrl.split("@")[1]
-      : databaseUrl;
-
-    // Construct the connection string with the extracted host
-    const connectionString = `postgresql://tight_analytics_agent:${password}@${databaseHost}`;
-    console.log(connectionString);
-
-    return;
-  } catch (error: any) {
-    spinnerRole.fail(
-      `Failed to create tight_analytics_agent role: ${error.message}`
-    );
-    console.error(error);
+  if (!existsSync(tightDir)) {
+    mkdirSync(tightDir, { recursive: true });
   }
+
+  await createDockerFile(tightDir);
+  await createTightAnalyticsFile(tightDir);
+
+  // Display the file structure created
+  console.log(kleur.dim("\nFiles created:"));
+  console.log(`
+tight-analytics/
+├── tight.analytics.yaml  # Mapping of database changes to analytics events
+└── Dockerfile            # Agent container definition. Run this in your infrastructure.
+  `);
+
+  console.log(
+    kleur.dim(
+      "\nNext Step: Configure your analytics events in tight.analytics.yaml\n"
+    )
+  );
 }
 
 export async function addTriggersForNewTables(sql: SQL) {
@@ -182,7 +128,7 @@ export async function addTriggersForNewTables(sql: SQL) {
   const tables = result.map((row: { table_name: string }) => row.table_name);
 
   // Add triggers for each table that doesn't already have one
-  console.log("\nChecking and creating triggers for tables:");
+  console.log(kleur.dim("\nChecking and creating triggers for tables:"));
 
   for (const table of tables) {
     const spinner = ora(`Checking trigger for ${table}`).start();
@@ -209,26 +155,64 @@ export async function addTriggersForNewTables(sql: SQL) {
     }
   }
 
-  console.log("\n✨ All triggers checked and created successfully");
+  console.log(kleur.dim("All triggers checked and created successfully"));
+}
 
-  // Check if the tight_analytics_agent role exists
-  console.log("\nChecking if tight_analytics_agent role exists:");
+async function createDockerFile(tightDir: string) {
+  const dockerFile = `
+FROM golang:1.21
 
-  const spinner = ora(`Checking tight_analytics_agent role`).start();
+# Set the working directory inside the container
+WORKDIR /app
 
-  const roleExists = await sql`
-    SELECT 1 FROM pg_roles WHERE rolname = 'tight_analytics_agent'
-  `;
+# Copy go.mod and go.sum first (for caching)
+COPY go.mod go.sum ./
 
-  if (roleExists.length === 0) {
-    spinner.info(
-      `Role 'tight_analytics_agent' does not exist. Creating it now...`
-    );
+# Download Go modules
+RUN go mod download
 
-    const password = "passs123";
-    await sql.file("./sql_functions/create_user.sql", [password]);
-    spinner.succeed(`Created 'tight_analytics_agent' role successfully`);
-  } else {
-    spinner.succeed(`Role 'tight_analytics_agent' already exists`);
+# Copy the rest of the source code
+COPY . .
+
+# Build the Go application
+RUN go build -o app .
+
+# Command to run the executable
+CMD ["./app"]
+`.trimStart();
+
+  await Bun.write(`${tightDir}/Dockerfile`, dockerFile);
+}
+
+async function createTightAnalyticsFile(tightDir: string) {
+  const tightAnalyticsFile = `
+# Mapping from Table Changes to Analytics Events
+# Documentation: https://
+track:
+  users.insert:
+    event: "USER_SIGN_UP"
+    properties:
+      email: "user.email"
+      name: "user.name"
+
+  invitations.update:
+    cond: "old.status != new.status && new.status == 'accepted' ? 'joined_org' : null"
+    joined_org:
+      org_id: "invitation.org_id"
+# Destionations for events with glob filters
+# Documentation: https://
+destinations:
+  posthog:
+    apiKey: "$POSTHOG_API_KEY"
+    filter: "*"
+
+  mixpanel:
+    apiKey: "static_api_key_here"
+    filter: "user_*"
+  `.trimStart();
+
+  const analyticsFilePath = `${tightDir}/tight.analytics.yaml`;
+  if (!existsSync(analyticsFilePath)) {
+    await Bun.write(analyticsFilePath, tightAnalyticsFile);
   }
 }
