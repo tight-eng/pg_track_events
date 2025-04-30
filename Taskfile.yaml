@@ -1,0 +1,27 @@
+version: "3"
+
+tasks:
+  install-deps:
+    desc: Install Go dependencies
+    cmds:
+      - cd agent && go mod download
+      - cd cli && bun install
+
+  build-wasm:
+    desc: Build the Go WASM binary
+    deps: [install-deps]
+    cmds:
+      - cd agent && GOOS=js GOARCH=wasm go build -o bin/wasmlib/bin.wasm ./pkg/wasmlib/main.go
+      - cd agent && cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" bin/wasmlib
+
+  copy-wasm:
+    desc: Copy WASM files to CLI directory
+    deps: [build-wasm]
+    cmds:
+      - mkdir -p cli/wasm
+      - cp agent/bin/wasmlib/bin.wasm cli/wasm/
+      - cp agent/bin/wasmlib/wasm_exec.js cli/wasm/
+
+  wasm:
+    desc: Build and copy WASM files
+    deps: [copy-wasm]
