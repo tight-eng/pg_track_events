@@ -1,8 +1,9 @@
 import { parse, parseDocument, stringify } from "yaml";
-import { analyticsConfigSchema } from "./yaml-schema";
+import { analyticsConfigSchema, zodErrorToString } from "./yaml-schema";
 import { z } from "zod";
 import kleur from "kleur";
 import { initWasm } from "./wasm";
+import { allowedTableNames } from "./introspection";
 
 type ParseConfigError = {
   message: string;
@@ -12,16 +13,45 @@ type ParseConfigError = {
 };
 
 export async function parseConfigFile(
-  filePath: string
+  filePath: string,
+  introspectedSchema: any = {}
 ): Promise<
   | { data: z.infer<typeof analyticsConfigSchema>; error: undefined }
   | { data: undefined; error: ParseConfigError[] }
 > {
   const fileContentsPromise = Bun.file(filePath).text();
+  const tables = allowedTableNames(introspectedSchema);
 
   try {
+    const errors: ParseConfigError[] = [];
     const fileContents = await fileContentsPromise;
     const parsedYaml = parse(fileContents);
+    const document = parseDocument(fileContents);
+
+    for (const table of Object.keys(parsedYaml.track)) {
+      const tableName = table.substring(0, table.lastIndexOf("."));
+      const tableNode = document.getIn(["track", table]);
+
+      const yamlNode = tableNode as { range?: [number, number] };
+      const startChar = yamlNode.range?.[0];
+      const lineNumber = fileContents
+        .substring(0, startChar)
+        .split("\n").length;
+
+      if (!tables.has(tableName)) {
+        const message = `Table ${tableName} does not exist in the database. Cannot track changes to it. `;
+        errors.push({
+          message,
+          startLine: lineNumber,
+          errorLine: lineNumber,
+          lines: getLinesNear(
+            fileContents.split("\n"),
+            [lineNumber, lineNumber],
+            message
+          ).text,
+        });
+      }
+    }
 
     const celValidation = await verifyCELExpressions(parsedYaml);
     // console.log(celValidation);
@@ -56,6 +86,10 @@ export async function parseConfigFile(
     //   return { data: undefined, error: errors };
     // }
 
+    if (errors.length > 0) {
+      return { data: undefined, error: errors };
+    }
+
     // Validate against schema
     return { data: analyticsConfigSchema.parse(parsedYaml), error: undefined };
   } catch (error: unknown) {
@@ -64,28 +98,43 @@ export async function parseConfigFile(
       const lines = fileContents.split("\n");
       const document = parseDocument(fileContents);
 
-      // Process each validation error
-      const errorMessages: ParseConfigError[] = error.issues.map((issue) => {
-        const node = document.getIn(issue.path)!;
+      const flattenedErrors = error.issues.flatMap((issue) => {
+        if (issue.code === "invalid_union") {
+          const value = document.getIn(issue.path)!;
+
+          if (typeof value === "object" && value !== null && "cond" in value) {
+            return issue.unionErrors[0]!.issues;
+          } else {
+            return issue.unionErrors[1]!.issues;
+          }
+        }
+
+        return [issue];
+      });
+
+      const errorMessages: ParseConfigError[] = flattenedErrors.map((issue) => {
+        const node =
+          document.getIn(issue.path, true) ||
+          document.getIn(issue.path.slice(0, -1), true);
         const yamlNode = node as { range?: [number, number] };
+
         const startChar = yamlNode.range?.[0];
-        const lineNumber = fileContents
+        const endChar = yamlNode.range?.[1];
+
+        const startLine = fileContents
           .substring(0, startChar)
           .split("\n").length;
 
-        const message =
-          issue.code === "invalid_union" &&
-          issue.path.length === 2 &&
-          issue.path[0] === "track"
-            ? invalidUnionMessage
-            : issue.message;
+        const endLine = fileContents.substring(0, endChar).split("\n").length;
 
-        const { text, startLine } = getLinesNear(lines, lineNumber!, message);
+        const message = zodErrorToString(issue);
+
+        const { text } = getLinesNear(lines, [startLine, endLine], message);
 
         return {
           message,
           startLine,
-          errorLine: lineNumber!,
+          errorLine: startLine,
           lines: text,
         };
       });
@@ -108,7 +157,7 @@ export async function parseConfigFile(
 
       const { text, startLine } = getLinesNear(
         lines,
-        lineNumber!,
+        [lineNumber ?? 0, lineNumber ?? 0],
         messageBeforeLine
       );
       return {
@@ -204,7 +253,7 @@ export async function verifyCELExpressions(
   });
 
   const result = await wasmlibValidateCELs({
-    schema: "todo",
+    schema: introspectedSchema,
     cels: pendingValidations,
   });
 
@@ -228,11 +277,11 @@ export async function verifyCELExpressions(
 
 function getLinesNear(
   lines: string[],
-  targetLine: number,
+  targetLines: [number, number],
   message: string
 ): { text: string; startLine: number } {
-  const startLine = Math.max(0, targetLine - 2);
-  const endLine = Math.min(lines.length, targetLine + 3);
+  const startLine = Math.max(0, targetLines[0] - 2);
+  const endLine = Math.min(lines.length, targetLines[1] + 3);
 
   // Find the minimum indentation level, ignoring empty lines
   const minIndent = Math.min(
@@ -251,7 +300,10 @@ function getLinesNear(
         .padStart(lineNumberLength + 1, " ");
       // Remove the minimum indentation from each line, but preserve empty lines
       const trimmedLine = line.trim().length > 0 ? line.slice(minIndent) : line;
-      if (index === targetLine - startLine - 1) {
+      if (
+        index >= targetLines[0] - startLine - 1 &&
+        index <= targetLines[1] - startLine - 1
+      ) {
         return `${lineNumber} | ${kleur.red(trimmedLine)}`;
       }
       return `${lineNumber} | ${trimmedLine}`;

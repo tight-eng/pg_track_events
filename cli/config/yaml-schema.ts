@@ -1,13 +1,16 @@
+import kleur from "kleur";
 import { z } from "zod";
 
 // Property getters (CEL expressions)
 const celExpressionSchema = z.string();
 
 // Schema for simple events
-const simpleEventSchema = z.object({
-  event: z.string(),
-  properties: z.record(celExpressionSchema).optional(),
-});
+const simpleEventSchema = z
+  .object({
+    event: z.string(),
+    properties: z.record(celExpressionSchema).optional(),
+  })
+  .strict();
 
 // Schema for conditional events
 const conditionalEventSchema = z
@@ -61,10 +64,25 @@ const destinationsSchema = z
   .optional();
 
 // Main schema for the YAML file
-const analyticsConfigSchema = z.object({
-  track: trackingConfigSchema,
-  destinations: destinationsSchema,
-});
+const analyticsConfigSchema = z
+  .object({
+    track: trackingConfigSchema,
+    destinations: destinationsSchema,
+  })
+  .strict();
 
 export type AnalyticsConfig = z.infer<typeof analyticsConfigSchema>;
 export { analyticsConfigSchema };
+
+export function zodErrorToString(issue: z.ZodError["issues"][0]) {
+  if (
+    issue.path.length === 2 &&
+    issue.path[0] === "track" &&
+    issue.code === "invalid_string" &&
+    issue.validation === "regex"
+  ) {
+    return `Transforms must be named {table}.{insert|update|delete}`;
+  }
+
+  return issue.message;
+}
