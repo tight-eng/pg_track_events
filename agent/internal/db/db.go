@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/typeeng/tight-agent/internal/config"
+	"github.com/typeeng/tight-agent/pkg/schemas"
 )
 
 type DBEventType string
@@ -134,4 +136,37 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 	}
 
 	return nil
+}
+
+// GetSchema retrieves the database schema using the provided SQL query
+func GetSchema(ctx context.Context, db *sql.DB) ([]*schemas.PostgresqlTableSchema, error) {
+	// Read the SQL query from the file
+	query, err := os.ReadFile("introspect_pg.sql")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema query: %w", err)
+	}
+
+	// Execute the query
+	rows, err := db.QueryContext(ctx, string(query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute schema query: %w", err)
+	}
+	defer rows.Close()
+
+	// Read the JSON result
+	var schemaJSON string
+	if !rows.Next() {
+		return nil, fmt.Errorf("no schema data returned")
+	}
+	if err := rows.Scan(&schemaJSON); err != nil {
+		return nil, fmt.Errorf("failed to scan schema JSON: %w", err)
+	}
+
+	// Unmarshal the JSON into our schema structs
+	var schemas []*schemas.PostgresqlTableSchema
+	if err := json.Unmarshal([]byte(schemaJSON), &schemas); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal schema JSON: %w", err)
+	}
+
+	return schemas, nil
 }

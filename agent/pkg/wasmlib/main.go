@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"syscall/js"
 
@@ -42,16 +41,16 @@ type CELValidator struct {
 
 func (validator *CELValidator) CheckInput() error {
 	if len(validator.Table) < 1 {
-		return errors.New("missing table name")
+		return fmt.Errorf("missing table name")
 	}
 	if validator.Operation != "insert" && validator.Operation != "update" && validator.Operation != "delete" {
-		return errors.New(fmt.Sprintf("invalid operation name: %s", validator.Operation))
+		return fmt.Errorf("invalid operation name: %s", validator.Operation)
 	}
 	if validator.ExprKind != "cond" && validator.ExprKind != "prop" {
-		return errors.New(fmt.Sprintf("invalid expression kind: %s", validator.ExprKind))
+		return fmt.Errorf("invalid expression kind: %s", validator.ExprKind)
 	}
 	if len(validator.Expr) < 1 {
-		return errors.New("missing expression to validate")
+		return fmt.Errorf("missing expression to validate")
 	}
 	return nil
 }

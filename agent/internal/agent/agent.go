@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -37,6 +39,18 @@ func (a *Agent) Start(ctx context.Context) error {
 	a.logger.Info("starting event processing agent",
 		"batch_size", a.cfg.BatchSize,
 		"interval", a.cfg.FetchInterval)
+
+	schema, err := db.GetSchema(ctx, a.db)
+	if err != nil {
+		a.logger.Error("failed to get schema", "error", err)
+		return err
+	}
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		a.logger.Error("failed to marshal schema", "error", err)
+		return err
+	}
+	fmt.Println(string(schemaJSON))
 
 	for {
 		select {
