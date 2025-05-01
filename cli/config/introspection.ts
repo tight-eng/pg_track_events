@@ -66,7 +66,7 @@ export function allowedTableNames(schema: DatabaseSchema) {
 
 export function applyIgnoresToSchema(
   schema: DatabaseSchema,
-  ignoreConfig: Record<string, string | string[]>
+  ignoreConfig: Record<string, "*" | string[]>
 ): DatabaseSchema {
   if (!ignoreConfig || Object.keys(ignoreConfig).length === 0) {
     return schema;

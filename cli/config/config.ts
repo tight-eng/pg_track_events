@@ -259,7 +259,7 @@ export async function verifyCELExpressions(
   });
 
   const result = await wasmlibValidateCELs({
-    schema: applyIgnoresToSchema(introspectedSchema, config.ignore),
+    schema: applyIgnoresToSchema(introspectedSchema, config.ignore || {}),
     cels: pendingValidations,
   });
 
