@@ -44,7 +44,7 @@ func CompileEventCondition(env *cel.Env, expr string) (cel.Program, error) {
 	}
 
 	// Verify the expression returns one of the valid event references
-	if ast.OutputType().TypeName() != fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventRefPbTypeName) {
+	if ast.OutputType().TypeName() != EventRefTypeName() && ast.OutputType().TypeName() != "null" {
 		return nil, fmt.Errorf("event condition must return a valid event reference, got %v", ast.OutputType())
 	}
 
@@ -101,7 +101,7 @@ func GenerateEventRefPb(events []string) (protoreflect.FileDescriptor, error) {
 			Name:     proto.String(event),
 			Number:   proto.Int32(int32(i + 1)),
 			Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-			TypeName: proto.String(fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventRefPbTypeName)),
+			TypeName: proto.String(EventRefTypeName()),
 		}
 		eventsMsg.Field = append(eventsMsg.Field, field)
 	}
@@ -156,7 +156,7 @@ func GenerateCELEventsOptionsFromPbFd(fd protoreflect.FileDescriptor) ([]cel.Env
 	// Create CEL environment options
 	var envOpts []cel.EnvOption
 	envOpts = append(envOpts, cel.TypeDescs(fd))
-	envOpts = append(envOpts, cel.Variable("events", cel.ObjectType(fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventsRefPbMessageName))))
+	envOpts = append(envOpts, cel.Variable("events", cel.ObjectType(EventRefsMessageName())))
 
 	return envOpts, nil
 }
@@ -173,20 +173,16 @@ func GenerateCELEventsOptions(events []string) ([]cel.EnvOption, error) {
 // CreateCELEnv creates a CEL environment with common declarations
 func GenerateBaseCELEnvOptions(pbPkgName *string, pbFd protoreflect.FileDescriptor, tableName string, op string) []cel.EnvOption {
 	// Create base declarations
-	var envOpts []cel.EnvOption
+	envOpts := []cel.EnvOption{}
 	var newVar, oldVar cel.EnvOption
 	if pbPkgName != nil && pbFd != nil {
 		rowObjType := cel.ObjectType(fmt.Sprintf("%s.%s", *pbPkgName, tableName))
 		envOpts = []cel.EnvOption{
 			cel.TypeDescs(pbFd),
-			cel.Variable(tableName, rowObjType),
 		}
 		newVar = cel.Variable("new", rowObjType)
 		oldVar = cel.Variable("old", rowObjType)
 	} else {
-		envOpts = []cel.EnvOption{
-			cel.Variable(tableName, cel.MapType(cel.StringType, cel.DynType)),
-		}
 		newVar = newVarDyn
 		oldVar = oldVarDyn
 	}
@@ -202,4 +198,14 @@ func GenerateBaseCELEnvOptions(pbPkgName *string, pbFd protoreflect.FileDescript
 	}
 
 	return envOpts
+}
+
+// EventRefTypeName returns the fully qualified type name for an EventRef
+func EventRefTypeName() string {
+	return fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventRefPbTypeName)
+}
+
+// EventRefsMessageName returns the name of the Events protobuf message
+func EventRefsMessageName() string {
+	return fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventsRefPbMessageName)
 }
