@@ -97,21 +97,32 @@ func (a *Agent) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := a.processEventBatch(ctx); err != nil {
-				a.logger.Error("error processing event batch", "error", err)
+			// Process events until we don't get a full batch
+			for {
+				fullBatch, err := a.processEventBatch(ctx)
+				if err != nil {
+					a.logger.Error("error processing event batch", "error", err)
+					break
+				}
+				if !fullBatch {
+					break
+				}
+				// If we got a full batch, continue processing immediately
+				a.logger.Info("processed full batch, checking for more events")
 			}
 		}
 	}
 }
 
 // processEventBatch fetches, processes, and deletes a batch of events
-func (a *Agent) processEventBatch(ctx context.Context) error {
+// Returns true if a full batch was processed (indicating there might be more events)
+func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 	a.logger.Info("checking for events to process")
 	// Fetch db events with lock
 	dbEvents, tx, err := db.FetchDBEvents(ctx, a.db)
 	if err != nil {
 		a.logger.Error("failed to fetch events", "error", err)
-		return err
+		return false, err
 	}
 
 	if len(dbEvents) == 0 {
@@ -120,7 +131,7 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 		if tx != nil {
 			tx.Rollback()
 		}
-		return nil
+		return false, nil
 	}
 
 	a.logger.Info("fetched events for processing", "count", len(dbEvents))
@@ -136,7 +147,7 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 			a.logger.Error("failed to process event", "error", err)
 			// TODO Think about how to handle retries, etc.
 			tx.Rollback()
-			return err
+			return false, err
 		}
 
 		if processedEvent != nil {
@@ -154,7 +165,7 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 		if err := a.sendProcessedEvents(ctx, processedEvents); err != nil {
 			tx.Rollback()
 			a.logger.Error("failed to send processed events to destinations", "error", err)
-			return err
+			return false, err
 		}
 		a.logger.Info("successfully sent processed events to destinations", "count", len(processedEvents))
 	} else {
@@ -166,11 +177,12 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 	if err := db.FlushDBEvents(ctx, tx, eventIds); err != nil {
 		tx.Rollback()
 		a.logger.Error("failed to delete processed events", "error", err)
-		return err
+		return false, err
 	}
 	a.logger.Info("flushed processed events", "count", len(eventIds))
 
-	return nil
+	// Return true if we processed a full batch (indicating there might be more events)
+	return len(dbEvents) == a.cfg.BatchSize, nil
 }
 
 func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.ProcessedEvent) error {
