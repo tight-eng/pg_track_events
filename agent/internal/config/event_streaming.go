@@ -230,6 +230,17 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Filter:      destination.Filter,
 				Destination: ph,
 			})
+		case "amplitude":
+			// TODO Pull endpoint from config
+			amp, err := destinations.NewAmplitudeDestination(destination.APIKey, "https://api2.amplitude.com", logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create amplitude destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: amp,
+			})
 		default:
 			return nil, fmt.Errorf("unknown destination type: %s", kind)
 		}

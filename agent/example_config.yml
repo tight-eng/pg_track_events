@@ -38,4 +38,7 @@ destinations:
     filter: "*"
   mixpanel:
     apiKey: "$MIXPANEL_PROJECT_TOKEN"
-    filter: "user_*"
+    filter: "*"
+  amplitude:
+    apiKey: "$AMPLITUDE_API_KEY"
+    filter: "*"

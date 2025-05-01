@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/typeeng/tight-agent/pkg/eventmodels"
@@ -14,19 +15,26 @@ import (
 
 // AmplitudeDestination implements ProcessedEventDestination for sending events to Amplitude
 type AmplitudeDestination struct {
-	apiKey string
-	client *http.Client
-	logger *slog.Logger
+	apiKey   string
+	endpoint string
+	client   *http.Client
+	logger   *slog.Logger
 }
 
 // NewAmplitudeDestination creates a new Amplitude destination with the given API key
-func NewAmplitudeDestination(apiKey string, logger *slog.Logger) (*AmplitudeDestination, error) {
+func NewAmplitudeDestination(apiKey string, endpoint string, logger *slog.Logger) (*AmplitudeDestination, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("API key is required")
 	}
+	if endpoint == "" {
+		endpoint = "https://api2.amplitude.com"
+	} else {
+		endpoint = strings.TrimSuffix(endpoint, "/")
+	}
 
 	return &AmplitudeDestination{
-		apiKey: apiKey,
+		apiKey:   apiKey,
+		endpoint: endpoint,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -80,7 +88,7 @@ func (a *AmplitudeDestination) SendBatch(ctx context.Context, processedEvents []
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api2.amplitude.com/batch", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/batch", a.endpoint), bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create Amplitude request: %w", err)
 	}
