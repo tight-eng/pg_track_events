@@ -9,11 +9,8 @@ import (
 )
 
 const (
-	apiBaseURLEnvKey               = "TIGHT_API_BASE_URL"
-	apiKeyEnvKey                   = "TIGHT_API_KEY"
 	databaseURLEnvKey              = "TIGHT_DATABASE_URL"
 	eventStreamingConfigPathEnvKey = "TIGHT_EVENT_STREAMING_CONFIG_PATH"
-	defaultAPIBaseURL              = "https://api.example.com"
 
 	batchSizeEnvKey      = "TIGHT_BATCH_SIZE"
 	fetchIntervalEnvKey  = "TIGHT_FETCH_INTERVAL"
@@ -31,9 +28,7 @@ const (
 )
 
 type AgentConfig struct {
-	APIBaseURL           string
 	DatabaseURL          string
-	APIKey               string
 	BatchSize            int
 	FetchInterval        time.Duration
 	DefaultSchemaName    string
@@ -71,19 +66,12 @@ func getDefaultConfig() *AgentConfig {
 	var err error
 
 	cfg := &AgentConfig{
-		APIBaseURL:           defaultAPIBaseURL,
 		BatchSize:            defaultBatchSize,
 		FetchInterval:        defaultFetchInterval,
 		DefaultSchemaName:    defaultSchemaName,
 		InternalSchemaName:   defaultInternalSchemaName,
 		EventLogTableName:    defaultEventLogTableName,
 		EventStreamingConfig: &EventStreamingConfig{},
-	}
-
-	cfg.APIBaseURL = env.FirstOrDefault(cfg.APIBaseURL, apiBaseURLEnvKey)
-	cfg.APIKey = env.First(apiKeyEnvKey)
-	if cfg.APIKey == "" {
-		panic("TIGHT_API_KEY is not set")
 	}
 
 	cfg.DatabaseURL = env.FirstOrDefault(cfg.DatabaseURL, databaseURLEnvKey)

@@ -6,8 +6,10 @@ import (
 )
 
 type ProcessedEvent struct {
-	Name       string
-	Properties map[string]interface{}
+	ID         string         `json:"id"`
+	Name       string         `json:"name"`
+	Properties map[string]any `json:"properties"`
+	Timestamp  time.Time      `json:"ts"`
 }
 
 type DBEventType string

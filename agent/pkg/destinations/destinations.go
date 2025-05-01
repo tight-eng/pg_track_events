@@ -1,11 +1,15 @@
 package destinations
 
-import "github.com/typeeng/tight-agent/pkg/eventmodels"
+import (
+	"context"
+
+	"github.com/typeeng/tight-agent/pkg/eventmodels"
+)
 
 type ProcessedEventDestination interface {
-	SendBatch(processedEvents []*eventmodels.ProcessedEvent) error
+	SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) error
 }
 
 type DBEventDestination interface {
-	SendBatch(dbEvents []*eventmodels.DBEvent) error
+	SendBatch(ctx context.Context, dbEvents []*eventmodels.DBEvent) error
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strconv"
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/internal/config"
@@ -94,10 +95,11 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 		}
 
 		return &eventmodels.ProcessedEvent{
+			ID:         strconv.FormatInt(dbEvent.ID, 10),
 			Name:       ec.Event,
 			Properties: properties,
+			Timestamp:  dbEvent.LoggedAt,
 		}, nil
-
 	case *config.ConditionalEvent:
 		// First evaluate the condition
 		selectedEventName, err := evaluateCondition(ec.CompiledCond, input, ec.CondEventsPbFd, ec.GetEventNames())
@@ -121,8 +123,10 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 		}
 
 		return &eventmodels.ProcessedEvent{
+			ID:         strconv.FormatInt(dbEvent.ID, 10),
 			Name:       *selectedEventName,
 			Properties: properties,
+			Timestamp:  dbEvent.LoggedAt,
 		}, nil
 	}
 
@@ -143,7 +147,7 @@ func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd 
 		return nil, fmt.Errorf("failed to evaluate condition: %w", err)
 	}
 
-	if out.Type().TypeName() != celutils.EventRefTypeName() {
+	if out.Type().TypeName() == celutils.EventRefTypeName() {
 		// Get the protobuf message from the CEL result
 		msg, ok := out.Value().(proto.Message)
 		if !ok {
@@ -163,7 +167,7 @@ func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd 
 			return nil, fmt.Errorf("selected event name is empty")
 		}
 		return &selectedEvent, nil
-	} else if out.Type().TypeName() == "null" {
+	} else if out.Type().TypeName() == "null_type" {
 		return nil, nil
 	}
 

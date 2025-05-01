@@ -40,6 +40,6 @@ BEGIN
         );
     END IF;
     
-    RETURN COALESCE(NEW, OLD);
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
