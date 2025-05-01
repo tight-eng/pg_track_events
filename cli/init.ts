@@ -187,7 +187,11 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   `);
 }
 
-export async function addTriggersForNewTables(sql: SQL) {
+export async function addTriggersForNewTables(
+  sql: SQL,
+  autoApply: boolean = false,
+  autoMigrate: boolean = false
+) {
   const sqlBuilder = new SQLBuilder(sql);
 
   // Get all tables in the public schema
@@ -220,16 +224,28 @@ export async function addTriggersForNewTables(sql: SQL) {
     return;
   }
 
-  const multi = new MultiSelect({
-    name: "value",
-    message: `Which tables do you want to have triggers on? ${kleur.dim(
-      "\n(Press space to toggle, arrows to navigate, enter to submit)"
-    )}`,
-    choices: tablesWithoutTriggers,
-    initial: tablesWithoutTriggers,
-  });
+  let selectedTables: string[];
+  if (autoApply || autoMigrate) {
+    selectedTables = tablesWithoutTriggers;
+    console.log(
+      kleur.dim(
+        `Found ${
+          selectedTables.length
+        } tables without triggers: ${selectedTables.join(", ")}`
+      )
+    );
+  } else {
+    const multi = new MultiSelect({
+      name: "value",
+      message: `Which tables do you want to have triggers on? ${kleur.dim(
+        "\n(Press space to toggle, arrows to navigate, enter to submit)"
+      )}`,
+      choices: tablesWithoutTriggers,
+      initial: tablesWithoutTriggers,
+    });
 
-  const selectedTables = await multi.run();
+    selectedTables = await multi.run();
+  }
 
   // Add triggers for each selected table
   for (const table of selectedTables) {
@@ -253,6 +269,30 @@ export async function addTriggersForNewTables(sql: SQL) {
     `\n\n${kleur.underline("Planned DB Queries")}\n` +
       sqlBuilder.getDescriptions().join("\n")
   );
+
+  if (autoApply) {
+    console.log("\n\n");
+    const status = await sqlBuilder.commit(true);
+
+    if (!status) {
+      console.log(kleur.red("Failed to add triggers"));
+      console.log(
+        "You may have to manually add the triggers with a migration. Docs here: http://..."
+      );
+      await sql.close();
+      return;
+    }
+    return;
+  }
+
+  if (autoMigrate) {
+    const outputFile = "add_triggers.sql";
+    console.log(
+      kleur.dim(`\nDumping migration to ${kleur.bold(outputFile)}...`)
+    );
+    await Bun.write(outputFile, sqlBuilder.dump());
+    return;
+  }
 
   console.log("\n\n");
   const applyMethod = new Input({

@@ -43,10 +43,18 @@ program
 program
   .command("apply-triggers")
   .description("scans for new tables and adds triggers for them")
+  .option(
+    "--auto-apply",
+    "add triggers to all non-ignored tables without prompting"
+  )
+  .option(
+    "--auto-migrate",
+    "add triggers to all non-ignored tables without prompting"
+  )
   .action(async (options) => {
     const [sql] = await getDBConnection();
 
-    await addTriggersForNewTables(sql);
+    await addTriggersForNewTables(sql, options.autoApply, options.autoMigrate);
   });
 
 program
