@@ -66,6 +66,13 @@
                             expr: 'old.email != new.email ? events.user_changed_email : events.user_updated',
                             events: ['user_changed_email', 'user_updated']
                         },
+                        {
+                            table: 'user',
+                            operation: 'update',
+                            exprKind: 'cond',
+                            expr: 'old.email != new.email ? events.user_changed_email : null',
+                            events: ['user_changed_email', 'user_updated']
+                        },
                     ]
                 })
                 console.log('Validation result: ', wasmValidateResult)

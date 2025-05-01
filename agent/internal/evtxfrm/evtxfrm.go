@@ -110,24 +110,23 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgNa
 			return nil, fmt.Errorf("failed to evaluate condition: %w", err)
 		}
 
-		// TODO Think about supporting null (don't send event)
-		if selectedEventName == "" {
+		if selectedEventName == nil {
 			return nil, nil // No event selected, skip this event
 		}
 
 		// Find the matching event based on the condition
-		event, exists := ec.Events[selectedEventName]
+		event, exists := ec.Events[*selectedEventName]
 		if !exists {
-			return nil, fmt.Errorf("selected event %s not found in event configuration", selectedEventName)
+			return nil, fmt.Errorf("selected event %s not found in event configuration", *selectedEventName)
 		}
 
 		properties, err := evaluateProperties(event.CompiledProperties, input)
 		if err != nil {
-			return nil, fmt.Errorf("failed to evaluate properties for conditional event %s: %w", selectedEventName, err)
+			return nil, fmt.Errorf("failed to evaluate properties for conditional event %s: %w", *selectedEventName, err)
 		}
 
 		return &ProcessedEvent{
-			Name:       selectedEventName,
+			Name:       *selectedEventName,
 			Properties: properties,
 		}, nil
 	}
@@ -135,40 +134,45 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgNa
 	return nil, nil
 }
 
-func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd protoreflect.FileDescriptor, eventNames []string) (string, error) {
+func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd protoreflect.FileDescriptor, eventNames []string) (*string, error) {
 	mergedInput := make(map[string]interface{})
 	maps.Copy(mergedInput, input)
 	eventsPb, err := celutils.NewEventRefPb(eventPbFd, eventNames)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal event names to protobuf: %w", err)
+		return nil, fmt.Errorf("failed to marshal event names to protobuf: %w", err)
 	}
 	mergedInput["events"] = eventsPb
 
 	out, _, err := prg.Eval(mergedInput)
 	if err != nil {
-		return "", fmt.Errorf("failed to evaluate condition: %w", err)
+		return nil, fmt.Errorf("failed to evaluate condition: %w", err)
 	}
 
-	// Get the protobuf message from the CEL result
-	msg, ok := out.Value().(proto.Message)
-	if !ok {
-		return "", fmt.Errorf("condition did not return a protobuf message")
+	if out.Type().TypeName() != celutils.EventRefTypeName() {
+		// Get the protobuf message from the CEL result
+		msg, ok := out.Value().(proto.Message)
+		if !ok {
+			return nil, fmt.Errorf("condition did not return a protobuf message")
+		}
+
+		// Get the value field from the EventRef message
+		msgDesc := msg.ProtoReflect().Descriptor()
+		valueField := msgDesc.Fields().ByName("value")
+		if valueField == nil {
+			return nil, fmt.Errorf("no value field found in EventRef message")
+		}
+
+		// Get the selected event name
+		selectedEvent := msg.ProtoReflect().Get(valueField).String()
+		if selectedEvent == "" {
+			return nil, fmt.Errorf("selected event name is empty")
+		}
+		return &selectedEvent, nil
+	} else if out.Type().TypeName() == "null" {
+		return nil, nil
 	}
 
-	// Get the value field from the EventRef message
-	msgDesc := msg.ProtoReflect().Descriptor()
-	valueField := msgDesc.Fields().ByName("value")
-	if valueField == nil {
-		return "", fmt.Errorf("no value field found in EventRef message")
-	}
-
-	// Get the selected event name
-	selectedEvent := msg.ProtoReflect().Get(valueField).String()
-	if selectedEvent == "" {
-		return "", fmt.Errorf("selected event name is empty")
-	}
-
-	return selectedEvent, nil
+	return nil, fmt.Errorf("event condition must return a valid event reference or null, got %v", out.Type().TypeName())
 }
 
 func evaluateProperties(compiledProps map[string]cel.Program, input map[string]interface{}) (map[string]interface{}, error) {

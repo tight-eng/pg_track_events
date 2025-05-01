@@ -2,31 +2,32 @@ track:
   user.insert:
     event: "user_signup"
     properties:
-      id: "user.id"
+      id: "new.id"
       email: "new.email"
-      name: "user.name"
+      name: "new.name"
       # data: "new.data"
       # data_inner: "new.data.inner"
 
   # user.update:
   #   event: "user_updated"
   #   properties:
-  #     id: "user.id"
+  #     id: "new.id"
   #     email: "new.email"
-  #     name: "user.name"
+  #     name: "new.name"
 
   user.update:
-    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    # cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    cond: "old.email != new.email ? events.user_changed_email : null"
     "user_changed_email":
       event: "user_changed_email"
       properties:
-        id: "user.id"
+        id: "new.id"
         previous_email: "old.email"
         new_email: "new.email"
     "user_updated":
       event: "user_updated"
       properties:
-        id: "user.id"
+        id: "new.id"
         email: "new.email"
         name: "new.name"
         # data: "new.data"
