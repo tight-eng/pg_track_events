@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import prompts from "prompts";
-import { addTriggersForNewTables, init } from "./init";
+import { init } from "./init";
+import { addTriggersForNewTables } from "./sync";
 import { SQL } from "bun";
 import path from "path";
 import ora from "ora";
@@ -43,10 +44,46 @@ program
 program
   .command("apply-triggers")
   .description("scans for new tables and adds triggers for them")
-  .action(async (options) => {
+  .option(
+    "--auto-apply",
+    "add triggers to all non-ignored tables without prompting"
+  )
+  .option(
+    "--auto-migrate",
+    "add triggers to all non-ignored tables without prompting"
+  )
+  .argument(
+    "[config-yml]",
+    "manually provide the path to your tight.analytics.yaml"
+  )
+  .action(async (configYml, options) => {
     const [sql] = await getDBConnection();
+    const introspectedSchema = await getIntrospectedSchema(sql);
+    const configPath = await getConfigPath(configYml);
+    // skip CEL validation for this command
+    const config = await parseConfigFile(configPath, introspectedSchema, true);
 
-    await addTriggersForNewTables(sql);
+    if (config.data) {
+      await addTriggersForNewTables(
+        sql,
+        configPath,
+        config.data.ignore || {},
+        options.autoApply,
+        options.autoMigrate
+      );
+    } else {
+      console.log(
+        kleur.red(
+          `${
+            config.error.length
+          } validation errors found. Fix them before syncing.\n\ntight validate ${path.relative(
+            process.cwd(),
+            configPath
+          )}`
+        )
+      );
+      process.exit(1);
+    }
   });
 
 program
@@ -63,34 +100,7 @@ program
 
     const introspectedSchema = await getIntrospectedSchema(sql);
 
-    const searchPaths = [
-      ...(configYml ? [path.resolve(configYml)] : []),
-      path.join(process.cwd(), "tight-analytics", "tight.analytics.yaml"),
-      path.join(process.cwd(), "tight.analytics.yaml"),
-    ];
-
-    // Find the first config file that exists
-    let configPath = null;
-    for (const path of searchPaths) {
-      if (existsSync(path)) {
-        configPath = path;
-        break;
-      }
-    }
-
-    if (!configPath) {
-      console.log(
-        kleur.red(
-          "Configuration file not found searching expected paths. Re-run and provide the path explicitly:"
-        )
-      );
-      console.log(kleur.dim("\ntight validate path/to/tight.analytics.yaml\n"));
-      process.exit(1);
-    }
-
-    console.log(
-      kleur.dim(`Running on: ${path.relative(process.cwd(), configPath)}\n\n`)
-    );
+    const configPath = await getConfigPath(configYml);
 
     const spinner = ora(
       "Validating mapping from database changes to analytics events..."
@@ -106,7 +116,7 @@ program
       spinner.fail(
         kleur.red(`${config.error.length} validation errors found.`)
       );
-      console.log("\n\n");
+      console.log("\n");
       for (const error of config.error) {
         console.log(error.lines + "\n");
       }
@@ -158,6 +168,11 @@ program
         "Type 'confirm' to proceed with dropping all Tight Analytics components",
     });
 
+    if (confirmation.confirm !== "confirm") {
+      console.log(kleur.dim("Dropping cancelled"));
+      process.exit(0);
+    }
+
     const [sql] = await getDBConnection();
 
     await dropTight(sql);
@@ -197,4 +212,39 @@ async function getDBConnection(additionalPrompt: string = "") {
     );
     process.exit(1);
   }
+}
+
+async function getConfigPath(configYml: string): Promise<string> {
+  const searchPaths = [
+    ...(configYml ? [path.resolve(configYml)] : []),
+    path.join(process.cwd(), "tight-analytics", "tight.analytics.yaml"),
+    path.join(process.cwd(), "tight.analytics.yaml"),
+  ];
+
+  // Find the first config file that exists
+  let configPath = null;
+  for (const path of searchPaths) {
+    if (existsSync(path)) {
+      configPath = path;
+      break;
+    }
+  }
+
+  if (!configPath) {
+    console.log(
+      kleur.red(
+        "Configuration file not found searching expected paths. Re-run and provide the path explicitly:"
+      )
+    );
+    console.log(kleur.dim("\ntight [command] path/to/tight.analytics.yaml\n"));
+    process.exit(1);
+  }
+
+  console.log(
+    kleur.dim(
+      `Running with config: ${path.relative(process.cwd(), configPath)}\n\n`
+    )
+  );
+
+  return configPath;
 }

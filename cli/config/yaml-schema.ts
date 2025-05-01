@@ -63,10 +63,20 @@ const destinationsSchema = z
   )
   .optional();
 
+// Ignore schema
+const ignoreSchema = z.record(
+  z.string(), // Table name
+  z.union([
+    z.literal("*"), // Ignore all columns
+    z.array(z.string()), // Array of column names to ignore
+  ])
+);
+
 // Main schema for the YAML file
 const analyticsConfigSchema = z
   .object({
     track: trackingConfigSchema,
+    ignore: ignoreSchema.optional(),
     destinations: destinationsSchema,
   })
   .strict();
@@ -86,3 +96,5 @@ export function zodErrorToString(issue: z.ZodError["issues"][0]) {
 
   return issue.message;
 }
+
+export type IgnoreConfig = z.infer<typeof ignoreSchema>;
