@@ -63,3 +63,34 @@ export function allowedTableNames(schema: DatabaseSchema) {
       .map((i) => i.split(".")[1]),
   ]);
 }
+
+export function applyIgnoresToSchema(
+  schema: DatabaseSchema,
+  ignoreConfig: Record<string, string | string[]>
+): DatabaseSchema {
+  if (!ignoreConfig || Object.keys(ignoreConfig).length === 0) {
+    return schema;
+  }
+
+  return schema.filter((table) => {
+    // Extract table name without schema prefix if present
+    const tableName = table.name.startsWith("public.")
+      ? table.name.split(".")[1]
+      : table.name;
+
+    // Skip tables that are fully ignored
+    if (ignoreConfig[tableName] === "*") {
+      return false;
+    }
+
+    // Process tables with specific column ignores
+    if (ignoreConfig[tableName] && Array.isArray(ignoreConfig[tableName])) {
+      // Filter out ignored columns
+      table.columns = table.columns.filter(
+        (column) => !ignoreConfig[tableName].includes(column.name)
+      );
+    }
+
+    return true;
+  });
+}

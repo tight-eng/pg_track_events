@@ -3,7 +3,11 @@ import { analyticsConfigSchema, zodErrorToString } from "./yaml-schema";
 import { z } from "zod";
 import kleur from "kleur";
 import { initWasm } from "./wasm";
-import { allowedTableNames } from "./introspection";
+import {
+  allowedTableNames,
+  applyIgnoresToSchema,
+  DatabaseSchema,
+} from "./introspection";
 
 /*
 todo 
@@ -181,7 +185,7 @@ export async function parseConfigFile(
 
 export async function verifyCELExpressions(
   config: z.infer<typeof analyticsConfigSchema>,
-  introspectedSchema = {}
+  introspectedSchema: DatabaseSchema = []
 ) {
   const wasmlibValidateCELs = await initWasm();
   const pendingValidations: {
@@ -255,7 +259,7 @@ export async function verifyCELExpressions(
   });
 
   const result = await wasmlibValidateCELs({
-    schema: introspectedSchema,
+    schema: applyIgnoresToSchema(introspectedSchema, config.ignore),
     cels: pendingValidations,
   });
 
