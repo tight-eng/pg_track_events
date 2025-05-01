@@ -5,6 +5,8 @@ track:
       id: "user.id"
       email: "new.email"
       name: "user.name"
+      # data: "new.data"
+      # data_inner: "new.data.inner"
 
   # user.update:
   #   event: "user_updated"
@@ -27,6 +29,8 @@ track:
         id: "user.id"
         email: "new.email"
         name: "new.name"
+        # data: "new.data"
+        # data_inner: "new.data['inner']"
 
 destinations:
   posthog:

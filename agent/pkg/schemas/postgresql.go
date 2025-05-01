@@ -24,7 +24,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+	_ "google.golang.org/protobuf/types/known/anypb"
 )
 
 type PostgresqlTableTrigger struct {
@@ -103,7 +105,11 @@ func (column *PostgresqlTableColumn) createFieldDescriptor(fieldNumber int32) *d
 	case "double precision", "real":
 		field.Type = descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
 	case "timestamp", "timestamptz", "date":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum() // Store as Unix timestamp
+		// TODO Do we want to give special treatment to timestamp/timestamptz?
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
+	case "json", "jsonb":
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+		field.TypeName = proto.String(".google.protobuf.Value")
 	default:
 		// Default to string for unknown types
 		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
@@ -138,9 +144,10 @@ func (table *PostgresqlTableSchema) createMessageDescriptor() *descriptorpb.Desc
 func (s PostgresqlTableSchemaList) GeneratePbDescriptorForTables(pbPkgName, tableNameGlob string) (protoreflect.FileDescriptor, error) {
 	// Create a new file descriptor proto
 	f := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String(pbPkgName + "_pg_schema.proto"),
-		Syntax:  proto.String("proto3"),
-		Package: proto.String(pbPkgName),
+		Name:       proto.String(pbPkgName + "_pg_schema.proto"),
+		Syntax:     proto.String("proto3"),
+		Package:    proto.String(pbPkgName),
+		Dependency: []string{"google/protobuf/struct.proto"},
 	}
 
 	// Convert each table to a message descriptor
@@ -163,8 +170,7 @@ func (s PostgresqlTableSchemaList) GeneratePbDescriptorForTables(pbPkgName, tabl
 		f.MessageType = append(f.MessageType, msg)
 	}
 
-	// Create the file descriptor
-	fd, err := protodesc.NewFile(f, nil)
+	fd, err := protodesc.NewFile(f, protoregistry.GlobalFiles)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file descriptor: %w", err)
 	}
