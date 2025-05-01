@@ -67,7 +67,10 @@ export async function parseConfigFile(
     }
 
     if (!skipCELValidation) {
-      const celValidation = await verifyCELExpressions(parsedYaml);
+      const celValidation = await verifyCELExpressions(
+        parsedYaml,
+        introspectedSchema
+      );
 
       for (const invalid of celValidation.invalid) {
         console.log(["track", ...invalid.path]);

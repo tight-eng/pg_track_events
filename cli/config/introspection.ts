@@ -55,9 +55,7 @@ export async function getIntrospectedSchema(sql: SQL): Promise<DatabaseSchema> {
 
 export function allowedTableNames(schema: DatabaseSchema) {
   const allNames = schema.map((table) => table.name);
-
   return new Set([
-    ...allNames,
     ...allNames
       .filter((i) => i.startsWith("public."))
       .map((i) => i.split(".")[1]),
