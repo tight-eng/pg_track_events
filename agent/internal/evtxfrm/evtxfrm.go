@@ -7,20 +7,15 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/internal/config"
-	"github.com/typeeng/tight-agent/internal/db"
 	"github.com/typeeng/tight-agent/pkg/celutils"
+	"github.com/typeeng/tight-agent/pkg/eventmodels"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-type ProcessedEvent struct {
-	Name       string
-	Properties map[string]interface{}
-}
-
-func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgName *string, pbFd protoreflect.FileDescriptor) (*ProcessedEvent, error) {
+func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig, pbPkgName *string, pbFd protoreflect.FileDescriptor) (*eventmodels.ProcessedEvent, error) {
 	// Create the key for looking up tracking config
 	key := fmt.Sprintf("%s.%s", dbEvent.RowTableName, dbEvent.EventType)
 	trackingConfig, exists := cfg.Track[key]
@@ -98,7 +93,7 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgNa
 			return nil, fmt.Errorf("failed to evaluate properties: %w", err)
 		}
 
-		return &ProcessedEvent{
+		return &eventmodels.ProcessedEvent{
 			Name:       ec.Event,
 			Properties: properties,
 		}, nil
@@ -125,7 +120,7 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgNa
 			return nil, fmt.Errorf("failed to evaluate properties for conditional event %s: %w", *selectedEventName, err)
 		}
 
-		return &ProcessedEvent{
+		return &eventmodels.ProcessedEvent{
 			Name:       *selectedEventName,
 			Properties: properties,
 		}, nil

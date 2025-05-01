@@ -6,28 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/typeeng/tight-agent/internal/config"
+	"github.com/typeeng/tight-agent/pkg/eventmodels"
 	"github.com/typeeng/tight-agent/pkg/schemas"
 )
-
-type DBEventType string
-
-const (
-	EventTypeInsert DBEventType = "insert"
-	EventTypeUpdate DBEventType = "update"
-	EventTypeDelete DBEventType = "delete"
-)
-
-type DBEvent struct {
-	ID           int64           `json:"id"`
-	EventType    DBEventType     `json:"event_type"`
-	RowTableName string          `json:"row_table_name"`
-	LoggedAt     time.Time       `json:"logged_at"`
-	OldRow       json.RawMessage `json:"old_row,omitempty"`
-	NewRow       json.RawMessage `json:"new_row,omitempty"`
-}
 
 func NewDB(ctx context.Context) (*sql.DB, error) {
 	cfg := config.ConfigFromContext(ctx)
@@ -44,7 +27,7 @@ func NewDB(ctx context.Context) (*sql.DB, error) {
 // using SELECT FOR UPDATE SKIP LOCKED to implement a queue pattern.
 // It returns the events and the active transaction which must be committed
 // or rolled back by the caller.
-func FetchDBEvents(ctx context.Context, db *sql.DB) ([]DBEvent, *sql.Tx, error) {
+func FetchDBEvents(ctx context.Context, db *sql.DB) ([]eventmodels.DBEvent, *sql.Tx, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -70,9 +53,9 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]DBEvent, *sql.Tx, error) 
 	}
 	defer rows.Close()
 
-	var events []DBEvent
+	var events []eventmodels.DBEvent
 	for rows.Next() {
-		var event DBEvent
+		var event eventmodels.DBEvent
 		var eventTypeStr string
 		var oldRow, newRow sql.NullString
 
@@ -88,7 +71,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]DBEvent, *sql.Tx, error) 
 			return nil, nil, fmt.Errorf("failed to scan event: %w", err)
 		}
 
-		event.EventType = DBEventType(eventTypeStr)
+		event.EventType = eventmodels.DBEventType(eventTypeStr)
 
 		if oldRow.Valid {
 			event.OldRow = json.RawMessage(oldRow.String)

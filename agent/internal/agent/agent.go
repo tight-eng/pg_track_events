@@ -11,6 +11,7 @@ import (
 	"github.com/typeeng/tight-agent/internal/db"
 	"github.com/typeeng/tight-agent/internal/evtxfrm"
 	"github.com/typeeng/tight-agent/internal/logger"
+	"github.com/typeeng/tight-agent/pkg/eventmodels"
 	"github.com/typeeng/tight-agent/pkg/schemas"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -113,7 +114,7 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 
 	// Track events to send to API and events to flush from DB
 	eventIds := make([]int64, len(dbEvents))
-	var processedEvents []*evtxfrm.ProcessedEvent
+	var processedEvents []*eventmodels.ProcessedEvent
 	for i, dbEvent := range dbEvents {
 		eventIds[i] = dbEvent.ID
 		// Process event with protobuf support
