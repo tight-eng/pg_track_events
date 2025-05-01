@@ -5,6 +5,17 @@ import kleur from "kleur";
 import { initWasm } from "./wasm";
 import { allowedTableNames } from "./introspection";
 
+/*
+todo 
+    [ ]  const lineNumber = fileContents
+        .substring(0, startChar)
+        .split("\n").length;
+
+        ^^ when these fail you get lines.length, not undefined 
+
+    [ ] errors in post checks will tryigger in same try / catch as schema validation 
+*/
+
 type ParseConfigError = {
   message: string;
   startLine: number;
@@ -27,6 +38,7 @@ export async function parseConfigFile(
     const fileContents = await fileContentsPromise;
     const parsedYaml = parse(fileContents);
     const document = parseDocument(fileContents);
+    const lines = fileContents.split("\n");
 
     for (const table of Object.keys(parsedYaml.track)) {
       const tableName = table.substring(0, table.lastIndexOf("."));
@@ -44,17 +56,33 @@ export async function parseConfigFile(
           message,
           startLine: lineNumber,
           errorLine: lineNumber,
-          lines: getLinesNear(
-            fileContents.split("\n"),
-            [lineNumber, lineNumber],
-            message
-          ).text,
+          lines: getLinesNear(lines, [lineNumber, lineNumber], message).text,
         });
       }
     }
 
     const celValidation = await verifyCELExpressions(parsedYaml);
-    // console.log(celValidation);
+
+    for (const invalid of celValidation.invalid) {
+      console.log(["track", ...invalid.path]);
+      const node = document.getIn(["track", ...invalid.path], true)!;
+      const yamlNode = node as { range?: [number, number] };
+      const startChar = yamlNode.range?.[0];
+      const lineNumber = fileContents
+        .substring(0, startChar)
+        .split("\n").length;
+
+      const errorMessage = invalid.validationError.replace(
+        /^<input>:\d+:\d+:\s*/,
+        ""
+      );
+      errors.push({
+        message: errorMessage,
+        startLine: lineNumber,
+        errorLine: lineNumber,
+        lines: getLinesNear(lines, [lineNumber, lineNumber], errorMessage).text,
+      });
+    }
 
     // if (celValidation.invalidCount > 0) {
     //   const fileContents = await fileContentsPromise;

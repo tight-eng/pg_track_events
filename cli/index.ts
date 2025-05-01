@@ -106,7 +106,7 @@ program
       spinner.fail(
         kleur.red(`${config.error.length} validation errors found.`)
       );
-      console.log("\n\n");
+      console.log("\n");
       for (const error of config.error) {
         console.log(error.lines + "\n");
       }
