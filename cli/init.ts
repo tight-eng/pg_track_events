@@ -1,13 +1,12 @@
 import { SQL } from "bun";
-import ora from "ora";
-import crypto from "crypto";
 import { existsSync } from "fs";
 import { mkdirSync } from "fs";
 import kleur from "kleur";
 import { SQLBuilder } from "./sql_functions/sql-builder";
+import { parseDocument } from "yaml";
 const { MultiSelect, Input } = require("enquirer");
 //constants
-const schemaName: string = "tight_analytics" as const;
+export const schemaName: string = "tight_analytics" as const;
 
 export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   const sqlBuilder = new SQLBuilder(sql);
@@ -47,11 +46,16 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     message: `Which tables do you want to track changes for? ${kleur.dim(
       "\n(Press space to toggle, arrows to navigate, enter to submit)"
     )}`,
-    choices: tables,
-    initial: tables,
+    choices: [...tables],
+    initial: [...tables],
   });
 
   const selectedTables = await multi.run();
+
+  // Create an array of ignored tables by finding the difference between all tables and selected tables
+  const ignoredTables = tables.filter(
+    (table) => !selectedTables.includes(table)
+  );
 
   sqlBuilder.add(
     `CREATE SCHEMA ${schemaName}`,
@@ -173,7 +177,9 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   }
 
   await createDockerFile(tightDir);
-  await createTightAnalyticsFile(tightDir);
+  // Get tables that should be ignored (all tables minus selected tables)
+
+  await createTightAnalyticsFile(tightDir, ignoredTables);
 
   console.log(
     kleur.dim(
@@ -185,163 +191,6 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
 ├── tight.analytics.yaml  # Mapping of database changes to analytics events
 └── Dockerfile            # Agent container definition. Run this in your infrastructure.
   `);
-}
-
-export async function addTriggersForNewTables(
-  sql: SQL,
-  autoApply: boolean = false,
-  autoMigrate: boolean = false
-) {
-  const sqlBuilder = new SQLBuilder(sql);
-
-  // Get all tables in the public schema
-  const result = await sql`
-    SELECT table_name 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public'
-  `;
-
-  const tables = result.map((row: { table_name: string }) => row.table_name);
-
-  // Get tables that don't have triggers
-  const tablesWithoutTriggers = [];
-  for (const table of tables) {
-    const triggerExists = await sql`
-      SELECT 1 
-      FROM information_schema.triggers
-      WHERE trigger_schema = 'public'
-        AND event_object_table = ${table}
-        AND trigger_name = ${table + "_audit_trigger"}
-    `;
-
-    if (triggerExists.length === 0) {
-      tablesWithoutTriggers.push(table);
-    }
-  }
-
-  if (tablesWithoutTriggers.length === 0) {
-    console.log(kleur.dim("All tracked tables have triggers. Exiting..."));
-    return;
-  }
-
-  let selectedTables: string[];
-  if (autoApply || autoMigrate) {
-    selectedTables = tablesWithoutTriggers;
-    console.log(
-      kleur.dim(
-        `Found ${
-          selectedTables.length
-        } tables without triggers: ${selectedTables.join(", ")}`
-      )
-    );
-  } else {
-    const multi = new MultiSelect({
-      name: "value",
-      message: `Which tables do you want to have triggers on? ${kleur.dim(
-        "\n(Press space to toggle, arrows to navigate, enter to submit)"
-      )}`,
-      choices: tablesWithoutTriggers,
-      initial: tablesWithoutTriggers,
-    });
-
-    selectedTables = await multi.run();
-  }
-
-  // Add triggers for each selected table
-  for (const table of selectedTables) {
-    sqlBuilder.add(
-      `CREATE TRIGGER ${table}_audit_trigger
-        AFTER INSERT OR UPDATE OR DELETE ON public.${table}
-        FOR EACH ROW
-        EXECUTE FUNCTION ${schemaName}.log_table_changes();`,
-      `${kleur.dim("+")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(
-        "trigger on"
-      )} ${kleur.bold(table)} ${kleur.dim("table")}`
-    );
-  }
-
-  if (sqlBuilder.length === 0) {
-    console.log(kleur.dim("No new triggers to add. Exiting..."));
-    return;
-  }
-
-  console.log(
-    `\n\n${kleur.underline("Planned DB Queries")}\n` +
-      sqlBuilder.getDescriptions().join("\n")
-  );
-
-  if (autoApply) {
-    console.log("\n\n");
-    const status = await sqlBuilder.commit(true);
-
-    if (!status) {
-      console.log(kleur.red("Failed to add triggers"));
-      console.log(
-        "You may have to manually add the triggers with a migration. Docs here: http://..."
-      );
-      await sql.close();
-      return;
-    }
-    return;
-  }
-
-  if (autoMigrate) {
-    const outputFile = "add_triggers.sql";
-    console.log(
-      kleur.dim(`\nDumping migration to ${kleur.bold(outputFile)}...`)
-    );
-    await Bun.write(outputFile, sqlBuilder.dump());
-    return;
-  }
-
-  console.log("\n\n");
-  const applyMethod = new Input({
-    name: "key",
-    message: `How do you want to apply the changes?\n${`${kleur.dim(
-      "apply to db"
-    )} ${kleur.blue("(y/yes)")}\n${kleur.dim(
-      "dump to migration file "
-    )}${kleur.blue("(o/out)")}\n${kleur.dim(
-      "exit without taking action"
-    )} ${kleur.blue("(enter)")}`}`,
-  });
-
-  const output = (await applyMethod.run()).toLowerCase().trim();
-
-  console.log("\n\n");
-  if (output === "y" || output === "yes") {
-    const status = await sqlBuilder.commit(true);
-
-    if (!status) {
-      console.log(kleur.red("Failed to add triggers"));
-      console.log(
-        "You may have to manually add the triggers with a migration. Docs here: http://..."
-      );
-      await sql.close();
-      return;
-    }
-  } else if (output === "o" || output === "out") {
-    const fileOutput = new Input({
-      name: "output",
-      initial: "add_triggers.sql",
-      message: `Which file do you want to output the changes to? ${kleur.dim(
-        "\nAppends by default and creates if does not exist."
-      )}`,
-    });
-
-    const outputFile = await fileOutput.run();
-
-    // Check if file exists and append if it does
-    if (existsSync(outputFile)) {
-      const existingContent = await Bun.file(outputFile).text();
-      await Bun.write(outputFile, existingContent + "\n\n" + sqlBuilder.dump());
-    } else {
-      await Bun.write(outputFile, sqlBuilder.dump());
-    }
-  } else {
-    console.log(kleur.dim("Exiting. No database changes made"));
-    return process.exit(0);
-  }
 }
 
 async function createDockerFile(tightDir: string) {
@@ -370,7 +219,10 @@ CMD ["./app"]
   await Bun.write(`${tightDir}/Dockerfile`, dockerFile);
 }
 
-async function createTightAnalyticsFile(tightDir: string) {
+async function createTightAnalyticsFile(
+  tightDir: string,
+  ignoredTables: string[]
+) {
   const tightAnalyticsFile = `
 # Mapping from Table Changes to Analytics Events
 # Documentation: https://
@@ -395,10 +247,21 @@ destinations:
   mixpanel:
     apiKey: "static_api_key_here"
     filter: "user_*"
+ignore: {}
   `.trimStart();
 
   const analyticsFilePath = `${tightDir}/tight.analytics.yaml`;
-  if (!existsSync(analyticsFilePath)) {
-    await Bun.write(analyticsFilePath, tightAnalyticsFile);
-  }
+
+  const analyticsFile = existsSync(analyticsFilePath)
+    ? parseDocument(await Bun.file(analyticsFilePath).text())
+    : parseDocument(tightAnalyticsFile);
+  analyticsFile.set(
+    "ignore",
+    ignoredTables.reduce((acc, table) => {
+      acc[table] = "*";
+      return acc;
+    }, {} as Record<string, string | string[]>)
+  );
+
+  await Bun.write(analyticsFilePath, analyticsFile.toString());
 }
