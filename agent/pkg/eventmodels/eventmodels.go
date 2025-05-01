@@ -6,8 +6,19 @@ import (
 )
 
 type ProcessedEvent struct {
-	Name       string
-	Properties map[string]interface{}
+	DBEventID    int64          `json:"id"`
+	DBEventIDStr string         `json:"id_str"`
+	Name         string         `json:"name"`
+	Properties   map[string]any `json:"properties"`
+	Timestamp    time.Time      `json:"ts"`
+	DistinctId   *string        `json:"distinct_id,omitempty"`
+}
+
+func (e *ProcessedEvent) GetDistinctId(fallback string) string {
+	if e.DistinctId == nil {
+		return fallback
+	}
+	return *e.DistinctId
 }
 
 type DBEventType string

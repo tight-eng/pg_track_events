@@ -16,8 +16,7 @@ track:
   #     name: "new.name"
 
   user.update:
-    # cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
-    cond: "old.email != new.email ? events.user_changed_email : null"
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
     "user_changed_email":
       event: "user_changed_email"
       properties:
@@ -38,5 +37,8 @@ destinations:
     apiKey: "$POSTHOG_API_KEY"
     filter: "*"
   mixpanel:
-    apiKey: "static_api_key_here"
-    filter: "user_*"
+    apiKey: "$MIXPANEL_PROJECT_TOKEN"
+    filter: "*"
+  amplitude:
+    apiKey: "$AMPLITUDE_API_KEY"
+    filter: "*"

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strconv"
+	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/internal/config"
@@ -13,6 +15,27 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
+)
+
+var (
+	propertyUserIdKeys = map[string]struct{}{
+		"userid":   {},
+		"user_id":  {},
+		"_user_id": {},
+	}
+	propertyUserIdKeysOnUserTable = map[string]struct{}{
+		// Common
+		"userid":   {},
+		"user_id":  {},
+		"_user_id": {},
+		// On user-like tables
+		"id": {},
+	}
+	commonUserTableNames = map[string]struct{}{
+		"users":  {},
+		"user":   {},
+		"_users": {},
+	}
 )
 
 func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig, pbPkgName *string, pbFd protoreflect.FileDescriptor) (*eventmodels.ProcessedEvent, error) {
@@ -94,10 +117,13 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 		}
 
 		return &eventmodels.ProcessedEvent{
-			Name:       ec.Event,
-			Properties: properties,
+			DBEventID:    dbEvent.ID,
+			DBEventIDStr: strconv.FormatInt(dbEvent.ID, 10),
+			Name:         ec.Event,
+			Properties:   properties,
+			Timestamp:    dbEvent.LoggedAt,
+			DistinctId:   pluckDistinctIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
 		}, nil
-
 	case *config.ConditionalEvent:
 		// First evaluate the condition
 		selectedEventName, err := evaluateCondition(ec.CompiledCond, input, ec.CondEventsPbFd, ec.GetEventNames())
@@ -121,12 +147,64 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 		}
 
 		return &eventmodels.ProcessedEvent{
-			Name:       *selectedEventName,
-			Properties: properties,
+			DBEventID:    dbEvent.ID,
+			DBEventIDStr: strconv.FormatInt(dbEvent.ID, 10),
+			Name:         *selectedEventName,
+			Properties:   properties,
+			Timestamp:    dbEvent.LoggedAt,
+			DistinctId:   pluckDistinctIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
 		}, nil
 	}
 
 	return nil, nil
+}
+
+// castValueToString converts various numeric and string types to a string pointer
+func castValueToString(val interface{}) *string {
+	switch v := val.(type) {
+	case string:
+		return &v
+	case int:
+		str := strconv.Itoa(v)
+		return &str
+	case int32:
+		str := strconv.FormatInt(int64(v), 10)
+		return &str
+	case int64:
+		str := strconv.FormatInt(v, 10)
+		return &str
+	case float32:
+		str := strconv.FormatFloat(float64(v), 'f', -1, 32)
+		return &str
+	case float64:
+		str := strconv.FormatFloat(v, 'f', -1, 64)
+		return &str
+	default:
+		return nil
+	}
+}
+
+func pluckDistinctIdFromPropertiesIfExists(tableName string, properties map[string]interface{}) *string {
+	if len(properties) == 0 {
+		return nil
+	}
+	if distinctId, exists := properties["distinct_id"]; exists {
+		return castValueToString(distinctId)
+	}
+	tableName = strings.ToLower(tableName)
+	keysToCheck := propertyUserIdKeys
+	if _, exists := commonUserTableNames[tableName]; exists {
+		keysToCheck = propertyUserIdKeysOnUserTable
+	}
+	// Iterate over properties first
+	for key, val := range properties {
+		// Check if the lowercase key matches any of our user ID keys
+		if _, exists := keysToCheck[strings.ToLower(key)]; exists {
+			return castValueToString(val)
+		}
+	}
+
+	return nil
 }
 
 func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd protoreflect.FileDescriptor, eventNames []string) (*string, error) {
@@ -143,7 +221,7 @@ func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd 
 		return nil, fmt.Errorf("failed to evaluate condition: %w", err)
 	}
 
-	if out.Type().TypeName() != celutils.EventRefTypeName() {
+	if out.Type().TypeName() == celutils.EventRefTypeName() {
 		// Get the protobuf message from the CEL result
 		msg, ok := out.Value().(proto.Message)
 		if !ok {
@@ -163,7 +241,7 @@ func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd 
 			return nil, fmt.Errorf("selected event name is empty")
 		}
 		return &selectedEvent, nil
-	} else if out.Type().TypeName() == "null" {
+	} else if out.Type().TypeName() == "null_type" {
 		return nil, nil
 	}
 

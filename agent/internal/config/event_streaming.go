@@ -2,12 +2,15 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/pkg/celutils"
+	"github.com/typeeng/tight-agent/pkg/destinations"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"gopkg.in/yaml.v3"
 )
@@ -82,18 +85,31 @@ type DestinationConfig struct {
 	Filter string `yaml:"filter,omitempty"`
 }
 
+type InitializedProcessedEventDestination struct {
+	Kind        string
+	Filter      string
+	Destination destinations.ProcessedEventDestination
+}
+
 // Validate checks if the APIKey is in the correct format
 func (dc *DestinationConfig) Validate() error {
 	if strings.HasPrefix(dc.APIKey, "$") {
-		// Validate environment variable format
-		envVarPattern := regexp.MustCompile(`^\$[A-Z_]+$`)
-		if !envVarPattern.MatchString(dc.APIKey) {
-			return fmt.Errorf("invalid environment variable format for API key")
+		envVarName := strings.TrimPrefix(dc.APIKey, "$")
+		val, ok := os.LookupEnv(envVarName)
+		if !ok {
+			return fmt.Errorf("destination API key environment variable %s is not set", envVarName)
 		}
+		dc.APIKey = val
 	}
 
 	if dc.Filter == "" {
 		dc.Filter = "*"
+	}
+	dc.Filter = strings.TrimSpace(dc.Filter)
+	if dc.Filter != "*" {
+		if _, err := filepath.Match(dc.Filter, ""); err != nil {
+			return fmt.Errorf("invalid filter pattern: %w", err)
+		}
 	}
 	return nil
 }
@@ -118,10 +134,10 @@ func compileProperties(env *cel.Env, properties map[string]string) (map[string]c
 }
 
 // Validate performs validation on the entire configuration
-func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.FileDescriptor) error {
+func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.FileDescriptor) error {
 	// Validate tracking configuration
 	tablePattern := regexp.MustCompile(`^([a-zA-Z0-9_]+)\.(insert|update|delete)$`)
-	for key, eventConfig := range ac.Track {
+	for key, eventConfig := range esc.Track {
 		matches := tablePattern.FindStringSubmatch(key)
 		if matches == nil {
 			return fmt.Errorf("invalid table operation format: %s", key)
@@ -177,13 +193,59 @@ func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.Fi
 	}
 
 	// Validate destinations
-	for _, dest := range ac.Destinations {
+	for destKey, dest := range esc.Destinations {
 		if err := dest.Validate(); err != nil {
 			return fmt.Errorf("destination validation failed: %w", err)
 		}
+		// Update the original map with any changes made during validation
+		esc.Destinations[destKey] = dest
 	}
 
 	return nil
+}
+
+func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger) ([]InitializedProcessedEventDestination, error) {
+	initializedDestinations := make([]InitializedProcessedEventDestination, 0, len(esc.Destinations))
+	for kind, destination := range esc.Destinations {
+		switch kind {
+		case "mixpanel":
+			// TODO Review additional config options
+			mp, err := destinations.NewMixpanelDestination(destination.APIKey, logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: mp,
+			})
+		case "posthog":
+			// TODO Pull endpoint from config
+			ph, err := destinations.NewPostHogDestination(destination.APIKey, "https://us.i.posthog.com", logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create posthog destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: ph,
+			})
+		case "amplitude":
+			// TODO Pull endpoint from config
+			amp, err := destinations.NewAmplitudeDestination(destination.APIKey, "https://api2.amplitude.com", logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create amplitude destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: amp,
+			})
+		default:
+			return nil, fmt.Errorf("unknown destination type: %s", kind)
+		}
+	}
+	return initializedDestinations, nil
 }
 
 // ParseEventStreamingConfig parses and validates a YAML configuration

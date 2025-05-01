@@ -70,6 +70,7 @@ export async function addTriggersForNewTables(
         ignoredTablesWithoutTriggers.push(table);
       }
     } else {
+      // @todo figure out how to support trigger body changing // being updated
       // check if ignored has changed
       if (ignoreConfig[table] && ignoreConfig[table] !== "*") {
         const ignoredCols = extractExcludedColumns(

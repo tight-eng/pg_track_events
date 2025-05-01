@@ -6,6 +6,8 @@ require (
 	github.com/google/cel-go v0.25.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
+	github.com/mixpanel/mixpanel-go v1.2.1
+	github.com/posthog/posthog-go v1.5.1
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v3 v3.0.1
 )

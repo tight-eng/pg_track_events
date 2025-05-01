@@ -35,7 +35,7 @@ func main() {
 	// Load configuration
 	cfg := config.ConfigFromContext(ctx)
 
-	logger.Logger().Info("loaded config", "event_streaming_config", cfg.EventStreamingConfig)
+	logger.Logger().Info("loaded config", "track", len(cfg.EventStreamingConfig.Track), "destinations", len(cfg.EventStreamingConfig.Destinations))
 
 	// Connect to database
 	dbConn, err := db.NewDB(ctx)
@@ -45,7 +45,10 @@ func main() {
 	defer dbConn.Close()
 
 	// Configure and start the agent
-	eventAgent := agent.NewAgent(ctx, dbConn)
+	eventAgent, err := agent.NewAgent(ctx, dbConn)
+	if err != nil {
+		log.Fatalf("Failed to initialize agent: %v", err)
+	}
 
 	log.Println("Starting tightdb-agent...")
 	if err := eventAgent.Start(ctx); err != nil && err != context.Canceled {
