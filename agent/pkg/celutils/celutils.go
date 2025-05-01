@@ -8,12 +8,14 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 var (
-	eventRefsPbPkgName = "__event_refs"
-	eventRefsPbFdName  = "__event_refs.proto"
-	eventRefPbTypeName = "EventRef"
+	eventRefsPbPkgName     = "__event_refs"
+	eventRefsPbFdName      = "__event_refs.proto"
+	eventRefPbTypeName     = "EventRef"
+	eventsRefPbMessageName = "Events"
 
 	newVarDyn = cel.Variable("new", cel.MapType(cel.StringType, cel.DynType))
 	oldVarDyn = cel.Variable("old", cel.MapType(cel.StringType, cel.DynType))
@@ -68,7 +70,7 @@ func CreateCELEnv(envOpts ...cel.EnvOption) (*cel.Env, error) {
 	return env, nil
 }
 
-func GenerateCELEventsOptions(events []string) ([]cel.EnvOption, error) {
+func GenerateEventRefPb(events []string) (protoreflect.FileDescriptor, error) {
 	// Create a new file descriptor proto for the EventRef type
 	f := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String(eventRefsPbFdName),
@@ -90,7 +92,7 @@ func GenerateCELEventsOptions(events []string) ([]cel.EnvOption, error) {
 
 	// Create the Events wrapper message type
 	eventsMsg := &descriptorpb.DescriptorProto{
-		Name: proto.String("Events"),
+		Name: proto.String(eventsRefPbMessageName),
 	}
 
 	// Add fields for each event
@@ -113,12 +115,59 @@ func GenerateCELEventsOptions(events []string) ([]cel.EnvOption, error) {
 		return nil, fmt.Errorf("failed to create file descriptor: %w", err)
 	}
 
+	return fd, nil
+}
+
+func NewEventRefPb(fd protoreflect.FileDescriptor, events []string) (proto.Message, error) {
+	msgDesc := fd.Messages().ByName(protoreflect.Name(eventsRefPbMessageName))
+	if msgDesc == nil {
+		return nil, fmt.Errorf("no message descriptor found for event message descriptor %s", eventsRefPbMessageName)
+	}
+
+	// Create a new message instance using dynamicpb
+	msg := dynamicpb.NewMessage(msgDesc)
+
+	// For each event, create an EventRef message and set it in the Events message
+	for _, event := range events {
+		field := msgDesc.Fields().ByName(protoreflect.Name(event))
+		if field == nil {
+			return nil, fmt.Errorf("no field found for event %s", event)
+		}
+
+		// Create the EventRef message
+		eventRefDesc := field.Message()
+		eventRefMsg := dynamicpb.NewMessage(eventRefDesc)
+
+		// Set the value field in the EventRef message
+		valueField := eventRefDesc.Fields().ByName("value")
+		if valueField == nil {
+			return nil, fmt.Errorf("no value field found in EventRef message")
+		}
+		eventRefMsg.Set(valueField, protoreflect.ValueOfString(event))
+
+		// Set the EventRef message in the Events message
+		msg.Set(field, protoreflect.ValueOfMessage(eventRefMsg))
+	}
+
+	return msg, nil
+}
+
+func GenerateCELEventsOptionsFromPbFd(fd protoreflect.FileDescriptor) ([]cel.EnvOption, error) {
 	// Create CEL environment options
 	var envOpts []cel.EnvOption
 	envOpts = append(envOpts, cel.TypeDescs(fd))
-	envOpts = append(envOpts, cel.Variable("events", cel.ObjectType(fmt.Sprintf("%s.%s", eventRefsPbPkgName, *eventsMsg.Name))))
+	envOpts = append(envOpts, cel.Variable("events", cel.ObjectType(fmt.Sprintf("%s.%s", eventRefsPbPkgName, eventsRefPbMessageName))))
 
 	return envOpts, nil
+}
+
+func GenerateCELEventsOptions(events []string) ([]cel.EnvOption, error) {
+	fd, err := GenerateEventRefPb(events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate event reference protobuf: %w", err)
+	}
+
+	return GenerateCELEventsOptionsFromPbFd(fd)
 }
 
 // CreateCELEnv creates a CEL environment with common declarations

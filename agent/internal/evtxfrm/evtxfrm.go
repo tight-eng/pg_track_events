@@ -3,10 +3,16 @@ package evtxfrm
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/google/cel-go/cel"
 	"github.com/typeeng/tight-agent/internal/config"
 	"github.com/typeeng/tight-agent/internal/db"
+	"github.com/typeeng/tight-agent/pkg/celutils"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 type ProcessedEvent struct {
@@ -14,7 +20,7 @@ type ProcessedEvent struct {
 	Properties map[string]interface{}
 }
 
-func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig) (*ProcessedEvent, error) {
+func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig, pbPkgName *string, pbFd protoreflect.FileDescriptor) (*ProcessedEvent, error) {
 	// Create the key for looking up tracking config
 	key := fmt.Sprintf("%s.%s", dbEvent.RowTableName, dbEvent.EventType)
 	trackingConfig, exists := cfg.Track[key]
@@ -22,30 +28,64 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig) (*Proce
 		return nil, nil // No tracking config for this event
 	}
 
-	// Parse JSON data
+	// Parse JSON data and convert to protobuf
 	var newData, oldData, tableNameData map[string]interface{}
+	var newPb, oldPb, tableNamePb proto.Message
+
 	if len(dbEvent.NewRow) > 0 {
-		if err := json.Unmarshal(dbEvent.NewRow, &newData); err != nil {
-			return nil, fmt.Errorf("failed to parse new row data: %w", err)
+		if pbPkgName != nil && pbFd != nil {
+			var err error
+			newPb, err = marshalToProtobuf(dbEvent.NewRow, dbEvent.RowTableName, pbFd)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal new row to protobuf: %w", err)
+			}
+		} else {
+			if err := json.Unmarshal(dbEvent.NewRow, &newData); err != nil {
+				return nil, fmt.Errorf("failed to parse new row data: %w", err)
+			}
 		}
 	}
+
 	if len(dbEvent.OldRow) > 0 {
-		if err := json.Unmarshal(dbEvent.OldRow, &oldData); err != nil {
-			return nil, fmt.Errorf("failed to parse old row data: %w", err)
+		if pbPkgName != nil && pbFd != nil {
+			var err error
+			oldPb, err = marshalToProtobuf(dbEvent.OldRow, dbEvent.RowTableName, pbFd)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal old row to protobuf: %w", err)
+			}
+		} else {
+			if err := json.Unmarshal(dbEvent.OldRow, &oldData); err != nil {
+				return nil, fmt.Errorf("failed to parse old row data: %w", err)
+			}
 		}
 	}
 
 	if dbEvent.EventType == "insert" || dbEvent.EventType == "update" {
 		tableNameData = newData
+		tableNamePb = newPb
 	} else if dbEvent.EventType == "delete" {
 		tableNameData = oldData
+		tableNamePb = oldPb
 	}
 
 	// Create input map for CEL evaluation
-	input := map[string]interface{}{
-		dbEvent.RowTableName: tableNameData,
-		"new":                newData,
-		"old":                oldData,
+	input := make(map[string]interface{})
+	if pbPkgName != nil && pbFd != nil {
+		input[dbEvent.RowTableName] = tableNamePb
+		if newPb != nil {
+			input["new"] = newPb
+		}
+		if oldPb != nil {
+			input["old"] = oldPb
+		}
+	} else {
+		input[dbEvent.RowTableName] = tableNameData
+		if newData != nil {
+			input["new"] = newData
+		}
+		if oldData != nil {
+			input["old"] = oldData
+		}
 	}
 
 	// TODO Implement conditional protobufs
@@ -65,46 +105,70 @@ func ProcessEvent(dbEvent *db.DBEvent, cfg *config.EventStreamingConfig) (*Proce
 
 	case *config.ConditionalEvent:
 		// First evaluate the condition
-		condResult, err := evaluateCondition(ec.CompiledCond, input)
+		selectedEventName, err := evaluateCondition(ec.CompiledCond, input, ec.CondEventsPbFd, ec.GetEventNames())
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate condition: %w", err)
 		}
 
-		if !condResult {
-			return nil, nil // Condition not met, skip this event
+		// TODO Think about supporting null (don't send event)
+		if selectedEventName == "" {
+			return nil, nil // No event selected, skip this event
 		}
 
 		// Find the matching event based on the condition
-		for eventName, event := range ec.Events {
-			properties, err := evaluateProperties(event.CompiledProperties, input)
-			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate properties for event %s: %w", eventName, err)
-			}
-
-			return &ProcessedEvent{
-				Name:       eventName,
-				Properties: properties,
-			}, nil
+		event, exists := ec.Events[selectedEventName]
+		if !exists {
+			return nil, fmt.Errorf("selected event %s not found in event configuration", selectedEventName)
 		}
 
-		return nil, nil // No matching event found
+		properties, err := evaluateProperties(event.CompiledProperties, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate properties for conditional event %s: %w", selectedEventName, err)
+		}
+
+		return &ProcessedEvent{
+			Name:       selectedEventName,
+			Properties: properties,
+		}, nil
 	}
 
 	return nil, nil
 }
 
-func evaluateCondition(prg cel.Program, input map[string]interface{}) (bool, error) {
-	out, _, err := prg.Eval(input)
+func evaluateCondition(prg cel.Program, input map[string]interface{}, eventPbFd protoreflect.FileDescriptor, eventNames []string) (string, error) {
+	mergedInput := make(map[string]interface{})
+	maps.Copy(mergedInput, input)
+	eventsPb, err := celutils.NewEventRefPb(eventPbFd, eventNames)
 	if err != nil {
-		return false, fmt.Errorf("failed to evaluate condition: %w", err)
+		return "", fmt.Errorf("failed to marshal event names to protobuf: %w", err)
+	}
+	mergedInput["events"] = eventsPb
+
+	out, _, err := prg.Eval(mergedInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate condition: %w", err)
 	}
 
-	result, ok := out.Value().(bool)
+	// Get the protobuf message from the CEL result
+	msg, ok := out.Value().(proto.Message)
 	if !ok {
-		return false, fmt.Errorf("condition did not return a boolean value")
+		return "", fmt.Errorf("condition did not return a protobuf message")
 	}
 
-	return result, nil
+	// Get the value field from the EventRef message
+	msgDesc := msg.ProtoReflect().Descriptor()
+	valueField := msgDesc.Fields().ByName("value")
+	if valueField == nil {
+		return "", fmt.Errorf("no value field found in EventRef message")
+	}
+
+	// Get the selected event name
+	selectedEvent := msg.ProtoReflect().Get(valueField).String()
+	if selectedEvent == "" {
+		return "", fmt.Errorf("selected event name is empty")
+	}
+
+	return selectedEvent, nil
 }
 
 func evaluateProperties(compiledProps map[string]cel.Program, input map[string]interface{}) (map[string]interface{}, error) {
@@ -117,4 +181,23 @@ func evaluateProperties(compiledProps map[string]cel.Program, input map[string]i
 		properties[key] = out.Value()
 	}
 	return properties, nil
+}
+
+// marshalToProtobuf converts a JSON map to a protobuf message
+func marshalToProtobuf(data json.RawMessage, tableName string, fd protoreflect.FileDescriptor) (proto.Message, error) {
+	// Find the message descriptor for the table
+	msgDesc := fd.Messages().ByName(protoreflect.Name(tableName))
+	if msgDesc == nil {
+		return nil, fmt.Errorf("no message descriptor found for table %s", tableName)
+	}
+
+	// Create a new message instance using dynamicpb
+	msg := dynamicpb.NewMessage(msgDesc)
+
+	// Unmarshal JSON into the protobuf message
+	if err := protojson.Unmarshal(data, msg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON to protobuf: %w", err)
+	}
+
+	return msg, nil
 }

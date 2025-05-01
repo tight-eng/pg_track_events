@@ -24,8 +24,9 @@ type SimpleEvent struct {
 type ConditionalEvent struct {
 	Cond string `yaml:"cond"`
 	// Compiled CEL expression for the condition
-	CompiledCond cel.Program
-	Events       map[string]struct {
+	CompiledCond   cel.Program
+	CondEventsPbFd protoreflect.FileDescriptor
+	Events         map[string]struct {
 		Properties map[string]string `yaml:"properties,omitempty"`
 		// Compiled CEL expressions for properties
 		CompiledProperties map[string]cel.Program
@@ -145,7 +146,12 @@ func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.Fi
 			}
 
 		case *ConditionalEvent:
-			eventsEnvOpts, err := celutils.GenerateCELEventsOptions(ec.GetEventNames())
+			var err error
+			ec.CondEventsPbFd, err = celutils.GenerateEventRefPb(ec.GetEventNames())
+			if err != nil {
+				return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
+			}
+			eventsEnvOpts, err := celutils.GenerateCELEventsOptionsFromPbFd(ec.CondEventsPbFd)
 			if err != nil {
 				return fmt.Errorf("failed to create CEL environment for %s: %w", key, err)
 			}
@@ -165,6 +171,7 @@ func (ac *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.Fi
 				if err != nil {
 					return fmt.Errorf("failed to compile properties for %s.%s: %w", key, eventName, err)
 				}
+				ec.Events[eventName] = event
 			}
 		}
 	}

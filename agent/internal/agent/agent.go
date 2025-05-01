@@ -116,8 +116,8 @@ func (a *Agent) processEventBatch(ctx context.Context) error {
 	var processedEvents []*evtxfrm.ProcessedEvent
 	for i, dbEvent := range dbEvents {
 		eventIds[i] = dbEvent.ID
-		// TODO Event processing logic
-		processedEvent, err := evtxfrm.ProcessEvent(&dbEvent, a.cfg.EventStreamingConfig)
+		// Process event with protobuf support
+		processedEvent, err := evtxfrm.ProcessEvent(&dbEvent, a.cfg.EventStreamingConfig, a.schemaPbPkgName, a.schemaPbDescriptor)
 		if err != nil {
 			a.logger.Error("failed to process event", "error", err)
 			// TODO Continue or what?

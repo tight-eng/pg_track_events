@@ -5,7 +5,14 @@ track:
       id: "user.id"
       email: "new.email"
       name: "user.name"
-  
+
+  # user.update:
+  #   event: "user_updated"
+  #   properties:
+  #     id: "user.id"
+  #     email: "new.email"
+  #     name: "user.name"
+
   user.update:
     cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
     "user_changed_email":
