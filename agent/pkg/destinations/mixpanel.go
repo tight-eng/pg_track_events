@@ -44,7 +44,7 @@ func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*
 		// Create Mixpanel event
 		mixpanelEvents[i] = m.client.NewEvent(
 			event.Name,
-			event.GetUserID(""),
+			event.GetDistinctId(""),
 			event.Properties,
 		)
 		// Best timestamp

@@ -209,6 +209,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 	for kind, destination := range esc.Destinations {
 		switch kind {
 		case "mixpanel":
+			// TODO Review additional config options
 			mp, err := destinations.NewMixpanelDestination(destination.APIKey, logger)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
@@ -217,6 +218,17 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Kind:        kind,
 				Filter:      destination.Filter,
 				Destination: mp,
+			})
+		case "posthog":
+			// TODO Pull endpoint from config
+			ph, err := destinations.NewPostHogDestination(destination.APIKey, "https://us.i.posthog.com", logger)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create posthog destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: ph,
 			})
 		default:
 			return nil, fmt.Errorf("unknown destination type: %s", kind)

@@ -11,14 +11,14 @@ type ProcessedEvent struct {
 	Name         string         `json:"name"`
 	Properties   map[string]any `json:"properties"`
 	Timestamp    time.Time      `json:"ts"`
-	UserID       *string        `json:"user_id,omitempty"`
+	DistinctId   *string        `json:"distinct_id,omitempty"`
 }
 
-func (e *ProcessedEvent) GetUserID(fallback string) string {
-	if e.UserID == nil {
+func (e *ProcessedEvent) GetDistinctId(fallback string) string {
+	if e.DistinctId == nil {
 		return fallback
 	}
-	return *e.UserID
+	return *e.DistinctId
 }
 
 type DBEventType string

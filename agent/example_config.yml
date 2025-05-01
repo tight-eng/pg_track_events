@@ -33,9 +33,9 @@ track:
         # data_inner: "new.data['inner']"
 
 destinations:
-  # posthog:
-  #   apiKey: "$POSTHOG_API_KEY"
-  #   filter: "*"
+  posthog:
+    apiKey: "$POSTHOG_API_KEY"
+    filter: "*"
   mixpanel:
     apiKey: "$MIXPANEL_PROJECT_TOKEN"
     filter: "user_*"

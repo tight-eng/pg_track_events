@@ -122,7 +122,7 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 			Name:         ec.Event,
 			Properties:   properties,
 			Timestamp:    dbEvent.LoggedAt,
-			UserID:       pluckUserIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
+			DistinctId:   pluckDistinctIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
 		}, nil
 	case *config.ConditionalEvent:
 		// First evaluate the condition
@@ -152,14 +152,45 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 			Name:         *selectedEventName,
 			Properties:   properties,
 			Timestamp:    dbEvent.LoggedAt,
-			UserID:       pluckUserIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
+			DistinctId:   pluckDistinctIdFromPropertiesIfExists(dbEvent.RowTableName, properties),
 		}, nil
 	}
 
 	return nil, nil
 }
 
-func pluckUserIdFromPropertiesIfExists(tableName string, properties map[string]interface{}) *string {
+// castValueToString converts various numeric and string types to a string pointer
+func castValueToString(val interface{}) *string {
+	switch v := val.(type) {
+	case string:
+		return &v
+	case int:
+		str := strconv.Itoa(v)
+		return &str
+	case int32:
+		str := strconv.FormatInt(int64(v), 10)
+		return &str
+	case int64:
+		str := strconv.FormatInt(v, 10)
+		return &str
+	case float32:
+		str := strconv.FormatFloat(float64(v), 'f', -1, 32)
+		return &str
+	case float64:
+		str := strconv.FormatFloat(v, 'f', -1, 64)
+		return &str
+	default:
+		return nil
+	}
+}
+
+func pluckDistinctIdFromPropertiesIfExists(tableName string, properties map[string]interface{}) *string {
+	if len(properties) == 0 {
+		return nil
+	}
+	if distinctId, exists := properties["distinct_id"]; exists {
+		return castValueToString(distinctId)
+	}
 	tableName = strings.ToLower(tableName)
 	keysToCheck := propertyUserIdKeys
 	if _, exists := commonUserTableNames[tableName]; exists {
@@ -169,25 +200,7 @@ func pluckUserIdFromPropertiesIfExists(tableName string, properties map[string]i
 	for key, val := range properties {
 		// Check if the lowercase key matches any of our user ID keys
 		if _, exists := keysToCheck[strings.ToLower(key)]; exists {
-			switch v := val.(type) {
-			case string:
-				return &v
-			case int:
-				str := strconv.Itoa(v)
-				return &str
-			case int32:
-				str := strconv.FormatInt(int64(v), 10)
-				return &str
-			case int64:
-				str := strconv.FormatInt(v, 10)
-				return &str
-			case float32:
-				str := strconv.FormatFloat(float64(v), 'f', -1, 32)
-				return &str
-			case float64:
-				str := strconv.FormatFloat(v, 'f', -1, 64)
-				return &str
-			}
+			return castValueToString(val)
 		}
 	}
 
