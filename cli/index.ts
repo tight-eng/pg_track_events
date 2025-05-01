@@ -148,7 +148,7 @@ program
     console.log(
       kleur.dim(
         "\nThis includes:\n" +
-          "- All database triggers\n" +
+          "- All tight_analytics database triggers\n" +
           "- The tight_analytics schema\n" +
           "- The event_log table\n" +
           "- The tight_analytics_agent user role\n"

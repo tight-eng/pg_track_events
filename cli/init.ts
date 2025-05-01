@@ -4,6 +4,7 @@ import { mkdirSync } from "fs";
 import kleur from "kleur";
 import { SQLBuilder } from "./sql_functions/sql-builder";
 import { parseDocument } from "yaml";
+import { logChangesBuilder } from "./sql_functions/log-changes-builder";
 const { MultiSelect, Input } = require("enquirer");
 //constants
 export const schemaName: string = "tight_analytics" as const;
@@ -91,27 +92,21 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     )} ${kleur.bold(schemaName)} ${kleur.dim("schema")}`
   );
 
-  // Register the log function
-  const logChangesPath = new URL(
-    "./sql_functions/log_changes.sql",
-    import.meta.url
-  );
-  const insertSql = await Bun.file(logChangesPath).text();
-  sqlBuilder.add(
-    insertSql,
-    `${kleur.dim("+")} ${kleur.bold("log_changes")} ${kleur.dim(
-      "function in"
-    )} ${kleur.bold(schemaName)} ${kleur.dim("schema")}`
-  );
-
   // Add triggers for each table with progress indicator
 
   for (const table of selectedTables) {
+    const [functionName, functionBody] = logChangesBuilder(table, []);
+    sqlBuilder.add(
+      functionBody,
+      `${kleur.dim("+")} ${kleur.bold(functionName)} ${kleur.dim(
+        "function for"
+      )} ${kleur.bold(table)} table trigger`
+    );
     sqlBuilder.add(
       `CREATE TRIGGER ${table}_audit_trigger
     AFTER INSERT OR UPDATE OR DELETE ON public.${table}
     FOR EACH ROW
-    EXECUTE FUNCTION ${schemaName}.log_table_changes();`,
+    EXECUTE FUNCTION ${functionName}();`,
       `${kleur.dim("+")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(
         "trigger on"
       )} ${kleur.bold(table)} ${kleur.dim("table")}`
