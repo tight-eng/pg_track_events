@@ -21,8 +21,6 @@ func NewMixpanelDestination(projectToken string, logger *slog.Logger) (*Mixpanel
 		return nil, fmt.Errorf("project token is required")
 	}
 
-	fmt.Println("projectToken", projectToken)
-
 	client := mixpanel.NewApiClient(projectToken)
 	if client == nil {
 		return nil, fmt.Errorf("failed to create Mixpanel client")
@@ -46,12 +44,15 @@ func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*
 		// Create Mixpanel event
 		mixpanelEvents[i] = m.client.NewEvent(
 			event.Name,
-			event.ID,
+			event.GetUserID(""),
 			event.Properties,
 		)
+		// Best timestamp
+		mixpanelEvents[i].AddTime(event.Timestamp)
+		// Deduplication
+		mixpanelEvents[i].AddInsertID(event.DBEventIDStr)
 		// Ensure that server IPs dont get sent to Mixpanel
 		mixpanelEvents[i].Properties["ip"] = "0"
-		mixpanelEvents[i].Properties["time"] = event.Timestamp.Unix()
 	}
 
 	m.logger.Info("sending events to Mixpanel", "count", len(mixpanelEvents))

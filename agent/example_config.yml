@@ -16,8 +16,7 @@ track:
   #     name: "new.name"
 
   user.update:
-    # cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
-    cond: "old.email != new.email ? events.user_changed_email : null"
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
     "user_changed_email":
       event: "user_changed_email"
       properties:

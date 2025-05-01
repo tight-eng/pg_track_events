@@ -6,10 +6,19 @@ import (
 )
 
 type ProcessedEvent struct {
-	ID         string         `json:"id"`
-	Name       string         `json:"name"`
-	Properties map[string]any `json:"properties"`
-	Timestamp  time.Time      `json:"ts"`
+	DBEventID    int64          `json:"id"`
+	DBEventIDStr string         `json:"id_str"`
+	Name         string         `json:"name"`
+	Properties   map[string]any `json:"properties"`
+	Timestamp    time.Time      `json:"ts"`
+	UserID       *string        `json:"user_id,omitempty"`
+}
+
+func (e *ProcessedEvent) GetUserID(fallback string) string {
+	if e.UserID == nil {
+		return fallback
+	}
+	return *e.UserID
 }
 
 type DBEventType string
