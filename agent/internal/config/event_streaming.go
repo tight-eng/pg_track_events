@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
+	"github.com/typeeng/tight-agent/internal/env"
 	"github.com/typeeng/tight-agent/pkg/celutils"
 	"github.com/typeeng/tight-agent/pkg/destinations"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -81,8 +82,15 @@ type TrackingConfig map[string]EventConfigUnmarshaler
 
 // DestinationConfig represents the configuration for a single analytics destination
 type DestinationConfig struct {
-	APIKey string `yaml:"apiKey"`
+	// All destinations will be filtered by this pattern
 	Filter string `yaml:"filter,omitempty"`
+	// API Key (generic)
+	APIKey string `yaml:"apiKey,omitempty"`
+	// Project Token (Mixpanel)
+	ProjectToken string `yaml:"projectToken,omitempty"`
+	// BigQuery specific configuration
+	TableID         string `yaml:"tableId,omitempty"`
+	CredentialsJSON string `yaml:"credentialsJson,omitempty"`
 }
 
 type InitializedProcessedEventDestination struct {
@@ -92,16 +100,8 @@ type InitializedProcessedEventDestination struct {
 }
 
 // Validate checks if the APIKey is in the correct format
-func (dc *DestinationConfig) Validate() error {
-	if strings.HasPrefix(dc.APIKey, "$") {
-		envVarName := strings.TrimPrefix(dc.APIKey, "$")
-		val, ok := os.LookupEnv(envVarName)
-		if !ok {
-			return fmt.Errorf("destination API key environment variable %s is not set", envVarName)
-		}
-		dc.APIKey = val
-	}
-
+func (dc *DestinationConfig) Validate(destKey string) error {
+	var err error
 	if dc.Filter == "" {
 		dc.Filter = "*"
 	}
@@ -110,6 +110,26 @@ func (dc *DestinationConfig) Validate() error {
 		if _, err := filepath.Match(dc.Filter, ""); err != nil {
 			return fmt.Errorf("invalid filter pattern: %w", err)
 		}
+	}
+
+	// Validate BigQuery specific configuration if present
+	if destKey == "bigquery" {
+		if dc.TableID, err = env.ValueOrRequiredEnvVar(dc.TableID); err != nil {
+			return fmt.Errorf("table ID is required for BigQuery destination: %w", err)
+		}
+		if dc.CredentialsJSON, err = env.ValueOrRequiredEnvVar(dc.CredentialsJSON); err != nil {
+			return fmt.Errorf("credentials JSON is required for BigQuery destination: %w", err)
+		}
+	} else if destKey == "mixpanel" {
+		if dc.ProjectToken, err = env.ValueOrRequiredEnvVar(dc.ProjectToken); err != nil {
+			return fmt.Errorf("project token is required for Mixpanel destination: %w", err)
+		}
+	} else if destKey == "amplitude" || destKey == "posthog" {
+		if dc.APIKey, err = env.ValueOrRequiredEnvVar(dc.APIKey); err != nil {
+			return fmt.Errorf("API key is required for %s destination: %w", destKey, err)
+		}
+	} else {
+		return fmt.Errorf("unknown destination type: %s", destKey)
 	}
 	return nil
 }
@@ -244,7 +264,7 @@ func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.F
 
 	// Validate destinations
 	for destKey, dest := range esc.Destinations {
-		if err := dest.Validate(); err != nil {
+		if err := dest.Validate(destKey); err != nil {
 			return fmt.Errorf("destination validation failed: %w", err)
 		}
 		// Update the original map with any changes made during validation
@@ -265,7 +285,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 		switch kind {
 		case "mixpanel":
 			// TODO Review additional config options
-			mp, err := destinations.NewMixpanelDestination(destination.APIKey, logger)
+			mp, err := destinations.NewMixpanelDestination(destination.ProjectToken, logger)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
 			}
@@ -295,6 +315,20 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Kind:        kind,
 				Filter:      destination.Filter,
 				Destination: amp,
+			})
+		case "bigquery":
+			bq, err := destinations.NewBigQueryDestination(
+				destination.CredentialsJSON,
+				destination.TableID,
+				logger,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create bigquery destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: bq,
 			})
 		default:
 			return nil, fmt.Errorf("unknown destination type: %s", kind)

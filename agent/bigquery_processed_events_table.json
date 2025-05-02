@@ -1,0 +1,38 @@
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Unique ID of the event record"
+    },
+    {
+        "name": "name",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Name of the event, for example, user_signed_up"
+    },
+    {
+        "name": "properties",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "event properties"
+    },
+    {
+        "name": "user_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "User id (aka distinct id) "
+    },
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp that represents when the event was observed"
+    },
+    {
+        "name": "processed_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp of when the event was processed into bigquery"
+    }
+]

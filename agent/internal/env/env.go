@@ -2,6 +2,7 @@
 package env
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
@@ -52,4 +53,26 @@ func IsSet(keys ...string) bool {
 	}
 
 	return false
+}
+
+// ValueOrRequiredEnvVar returns the value of the plain string or, if the string starts with "$", the value of the environment variable.
+// If the environment variable is not set, ValueOrRequiredEnvVar returns an error.
+func ValueOrRequiredEnvVar(str string) (string, error) {
+	str = strings.TrimSpace(str)
+	if str == "" {
+		return "", fmt.Errorf("no value or environment variable provided")
+	}
+	if strings.HasPrefix(str, "$") {
+		envVarName := strings.TrimPrefix(str, "$")
+		val, ok := os.LookupEnv(envVarName)
+		if !ok {
+			return "", fmt.Errorf("environment variable %s is not set", envVarName)
+		}
+		if val == "" {
+			return "", fmt.Errorf("environment variable %s is empty", envVarName)
+		}
+		val = strings.TrimSpace(val)
+		return val, nil
+	}
+	return str, nil
 }

@@ -34,14 +34,18 @@ track:
 
 destinations:
   posthog:
+    filter: "*"
     apiKey: "$POSTHOG_API_KEY"
-    filter: "*"
   mixpanel:
-    apiKey: "$MIXPANEL_PROJECT_TOKEN"
     filter: "*"
+    projectToken: "$MIXPANEL_PROJECT_TOKEN"
   amplitude:
-    apiKey: "$AMPLITUDE_API_KEY"
     filter: "*"
+    apiKey: "$AMPLITUDE_API_KEY"
+  bigquery:
+    filter: "*"
+    tableId: "$BIGQUERY_TABLE_ID"
+    credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
 
 ignore:
   auth_authenticator: "*" # This ignores all columns in the auth_authenticator table
