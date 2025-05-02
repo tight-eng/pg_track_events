@@ -54,7 +54,7 @@ program
   )
   .argument(
     "[config-yml]",
-    "manually provide the path to your tight.analytics.yaml"
+    "manually provide the path to your pg_track_events.config.yaml"
   )
   .action(async (configYml, options) => {
     const [sql] = await getDBConnection();
@@ -89,11 +89,11 @@ program
 program
   .command("validate")
   .description(
-    "Validates the tight.analytics.yaml configuration is valid and compliant with your db schemas"
+    "Validates the pg_track_events.config.yaml configuration is valid and compliant with your db schemas"
   )
   .argument(
     "[config-yml]",
-    "manually provide the path to your tight.analytics.yaml"
+    "manually provide the path to your pg_track_events.config.yaml"
   )
   .action(async (configYml) => {
     const [sql] = await getDBConnection();
@@ -218,8 +218,8 @@ async function getDBConnection(additionalPrompt: string = "") {
 async function getConfigPath(configYml: string): Promise<string> {
   const searchPaths = [
     ...(configYml ? [path.resolve(configYml)] : []),
-    path.join(process.cwd(), "tight-analytics", "tight.analytics.yaml"),
-    path.join(process.cwd(), "tight.analytics.yaml"),
+    path.join(process.cwd(), "tight-analytics", "pg_track_events.config.yaml"),
+    path.join(process.cwd(), "pg_track_events.config.yaml"),
   ];
 
   // Find the first config file that exists
@@ -237,7 +237,7 @@ async function getConfigPath(configYml: string): Promise<string> {
         "Configuration file not found searching expected paths. Re-run and provide the path explicitly:"
       )
     );
-    console.log(kleur.dim("\ntight [command] path/to/tight.analytics.yaml\n"));
+    console.log(kleur.dim("\ntight [command] path/to/pg_track_events.config.yaml\n"));
     process.exit(1);
   }
 

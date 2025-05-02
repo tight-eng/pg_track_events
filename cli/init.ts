@@ -190,12 +190,12 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
 
   console.log(
     kleur.dim(
-      "\nNext Step: Configure your analytics events in tight.analytics.yaml\n"
+      "\nNext Step: Configure your analytics events in pg_track_events.config.yaml\n"
     )
   );
 
   console.log(`tight-analytics/
-├── tight.analytics.yaml  # Mapping of database changes to analytics events
+├── pg_track_events.config.yaml  # Mapping of database changes to analytics events
 └── Dockerfile            # Agent container definition. Run this in your infrastructure.
   `);
 }
@@ -241,7 +241,7 @@ destinations:
 ignore: {}
   `.trimStart();
 
-  const analyticsFilePath = `${tightDir}/tight.analytics.yaml`;
+  const analyticsFilePath = `${tightDir}/pg_track_events.config.yaml`;
 
   const analyticsFile = existsSync(analyticsFilePath)
     ? parseDocument(await Bun.file(analyticsFilePath).text())
