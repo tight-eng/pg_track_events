@@ -205,7 +205,7 @@ async function getDBConnection(additionalPrompt: string = "") {
   spinner.succeed(kleur.dim("Connected to database"));
 
   try {
-    return [new SQL(DATABASE_URL), DATABASE_URL];
+    return [new SQL(DATABASE_URL, { prepare: false }), DATABASE_URL];
   } catch (error) {
     spinner.fail(kleur.red("Failed to connect to database"));
     console.error(
