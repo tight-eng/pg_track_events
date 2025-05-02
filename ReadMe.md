@@ -1,8 +1,3 @@
----
-title: pg_track_events
-description: Emits analytics events as your data changes
----
-
 # pg_track_events
 
 **Your database knows what happened — why aren’t you listening?**

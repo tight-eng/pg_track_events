@@ -138,21 +138,21 @@ program
 program
   .command("drop")
   .description(
-    "Drop all Tight Analytics database objects (triggers, tables, roles)"
+    "Drop all scheme_for_pg_track_events database objects (triggers, tables, roles)"
   )
   .action(async () => {
     console.log(
       kleur.yellow(
-        "\n⚠️  WARNING: This will remove all Tight Analytics components from your database"
+        "\n⚠️  WARNING: This will remove all scheme_for_pg_track_events components from your database"
       )
     );
     console.log(
       kleur.dim(
         "\nThis includes:\n" +
-          "- All tight_analytics database triggers\n" +
-          "- The tight_analytics schema\n" +
+          "- All scheme_for_pg_track_events database triggers\n" +
+          "- The scheme_for_pg_track_events schema\n" +
           "- The event_log table\n" +
-          "- The tight_analytics_agent user role\n"
+          "- The scheme_for_pg_track_events_agent user role\n"
       )
     );
     console.log(
@@ -166,7 +166,7 @@ program
       type: "text",
       name: "confirm",
       message:
-        "Type 'confirm' to proceed with dropping all Tight Analytics components",
+        "Type 'confirm' to proceed with dropping all scheme_for_pg_track_events components",
     });
 
     if (confirmation.confirm !== "confirm") {
@@ -237,7 +237,9 @@ async function getConfigPath(configYml: string): Promise<string> {
         "Configuration file not found searching expected paths. Re-run and provide the path explicitly:"
       )
     );
-    console.log(kleur.dim("\ntight [command] path/to/pg_track_events.config.yaml\n"));
+    console.log(
+      kleur.dim("\ntight [command] path/to/pg_track_events.config.yaml\n")
+    );
     process.exit(1);
   }
 

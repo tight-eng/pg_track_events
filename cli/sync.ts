@@ -62,7 +62,7 @@ export async function addTriggersForNewTables(
       WHERE t.trigger_schema = 'public'
           AND t.event_object_table = ${table}
           AND t.trigger_name = ${table + "_audit_trigger"}
-          AND n.nspname = 'tight_analytics';
+          AND n.nspname = 'scheme_for_pg_track_events';
     `;
 
     if (triggerExists.length === 0) {

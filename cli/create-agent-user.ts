@@ -3,8 +3,10 @@ import ora from "ora";
 import kleur from "kleur";
 
 export async function createAgentUser(sql: SQL, databaseUrl: string) {
-  console.log("\n" + "Creating tight_analytics_agent role:");
-  const spinnerRole = ora(`Creating tight_analytics_agent role`).start();
+  console.log("\n" + "Creating scheme_for_pg_track_events_agent role:");
+  const spinnerRole = ora(
+    `Creating scheme_for_pg_track_events_agent role`
+  ).start();
   try {
     const password = Buffer.from(crypto.getRandomValues(new Uint8Array(32)))
       .toString("base64")
@@ -17,27 +19,27 @@ export async function createAgentUser(sql: SQL, databaseUrl: string) {
           password text := '${password}';
       BEGIN
          -- Create the role if it doesn't already exist, or alter it if it does
-         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tight_analytics_agent') THEN
-            EXECUTE 'CREATE ROLE tight_analytics_agent LOGIN PASSWORD ' || quote_literal(password);
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scheme_for_pg_track_events_agent') THEN
+            EXECUTE 'CREATE ROLE scheme_for_pg_track_events_agent LOGIN PASSWORD ' || quote_literal(password);
          ELSE
-            EXECUTE 'ALTER ROLE tight_analytics_agent WITH PASSWORD ' || quote_literal(password);
+            EXECUTE 'ALTER ROLE scheme_for_pg_track_events_agent WITH PASSWORD ' || quote_literal(password);
          END IF;
          -- Grant permissions to the user
-         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO tight_analytics_agent';
+         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO scheme_for_pg_track_events_agent';
          -- Public schema permissions
-         GRANT USAGE ON SCHEMA public TO tight_analytics_agent;
-         GRANT SELECT ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO tight_analytics_agent;
-         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO tight_analytics_agent;
-         -- Tight analytics schema permissions
-         GRANT USAGE ON SCHEMA tight_analytics TO tight_analytics_agent;
-         GRANT SELECT, INSERT ON tight_analytics.event_log TO tight_analytics_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA tight_analytics GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tight_analytics_agent;
+         GRANT USAGE ON SCHEMA public TO scheme_for_pg_track_events_agent;
+         GRANT SELECT ON ALL TABLES IN SCHEMA public TO scheme_for_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO scheme_for_pg_track_events_agent;
+         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO scheme_for_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO scheme_for_pg_track_events_agent;
+         -- scheme_for_pg_track_events schema permissions
+         GRANT USAGE ON SCHEMA scheme_for_pg_track_events TO scheme_for_pg_track_events_agent;
+         GRANT SELECT, INSERT ON scheme_for_pg_track_events.event_log TO scheme_for_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA scheme_for_pg_track_events GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO scheme_for_pg_track_events_agent;
       END $$;
     `);
     spinnerRole.succeed(
-      `Created a limited access tight_analytics_agent role with a random password`
+      `Created a limited access scheme_for_pg_track_events_agent role with a random password`
     );
     console.log(
       "\n" +
@@ -53,14 +55,16 @@ export async function createAgentUser(sql: SQL, databaseUrl: string) {
       ? databaseUrl.split("@")[1]
       : databaseUrl;
     // Construct the connection string with the extracted host
-    const connectionString = `postgresql://tight_analytics_agent:${password}@${databaseHost}`;
+    const connectionString = `postgresql://scheme_for_pg_track_events_agent:${password}@${databaseHost}`;
     console.log(kleur.dim(connectionString) + "\n");
     return;
   } catch (error: any) {
     spinnerRole.fail(
       kleur
         .red()
-        .bold(`Failed to create tight_analytics_agent role: ${error.message}`)
+        .bold(
+          `Failed to create scheme_for_pg_track_events_agent role: ${error.message}`
+        )
     );
     console.error(kleur.red(error));
   }
