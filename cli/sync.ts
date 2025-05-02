@@ -208,7 +208,7 @@ export async function addTriggersForNewTables(
       )} ${kleur.bold(table)} table trigger`
     );
     sqlBuilder.add(
-      `CREATE TRIGGER ${table}_audit_trigger
+      `CREATE OR REPLACE TRIGGER ${table}_audit_trigger
       AFTER INSERT OR UPDATE OR DELETE ON public.${table}
       FOR EACH ROW
       EXECUTE FUNCTION ${functionName}();`,

@@ -6,66 +6,57 @@ export function logChangesBuilder(
   tableName: string,
   includedColumns: string[]
 ) {
-  const columnsClause =
-    includedColumns.length > 0 ? `(${includedColumns.sort().join(", ")})` : "*";
-
   const functionName = tableNameToAuditFunctionName(tableName);
+
+  // Create json_build_object string for columns
+  const jsonBuildObject = (prefix: "NEW" | "OLD") =>
+    `json_build_object(${includedColumns
+      .sort()
+      .map((col) => `'${col}', ${prefix}.${col}`)
+      .join(", ")})`;
+
   const functionBody = `-- Generic trigger function for insert, update, and delete
 CREATE OR REPLACE FUNCTION ${functionName}()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Wrap the logging in a separate transaction with error handling
-    BEGIN
-        IF (TG_OP = 'INSERT') THEN
-            INSERT INTO tight_analytics.event_log (
-                event_type,
-                row_table_name,
-                old_row,
-                new_row
-            ) VALUES (
-                'insert',
-                TG_TABLE_NAME,
-                NULL,
-                (SELECT row_to_json(t) FROM (
-                    SELECT ${columnsClause} FROM NEW
-                ) t)
-            );
-        ELSIF (TG_OP = 'UPDATE') THEN
-            INSERT INTO tight_analytics.event_log (
-                event_type,
-                row_table_name,
-                old_row,
-                new_row
-            ) VALUES (
-                'update',
-                TG_TABLE_NAME,
-                (SELECT row_to_json(t) FROM (
-                    SELECT ${columnsClause} FROM OLD
-                ) t),
-                (SELECT row_to_json(t) FROM (
-                    SELECT ${columnsClause} FROM NEW
-                ) t)
-            );
-        ELSIF (TG_OP = 'DELETE') THEN
-            INSERT INTO tight_analytics.event_log (
-                event_type,
-                row_table_name,
-                old_row,
-                new_row
-            ) VALUES (
-                'delete',
-                TG_TABLE_NAME,
-                (SELECT row_to_json(t) FROM (
-                    SELECT ${columnsClause} FROM OLD
-                ) t),
-                NULL
-            );
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        -- If logging fails, just skip it and continue with the main operation
-        NULL;
-    END;
-    
+    IF (TG_OP = 'INSERT') THEN
+        INSERT INTO tight_analytics.event_log (
+            event_type,
+            row_table_name,
+            old_row,
+            new_row
+        ) VALUES (
+            'insert',
+            TG_TABLE_NAME,
+            NULL,
+            ${jsonBuildObject("NEW")}
+        );
+    ELSIF (TG_OP = 'UPDATE') THEN
+        INSERT INTO tight_analytics.event_log (
+            event_type,
+            row_table_name,
+            old_row,
+            new_row
+        ) VALUES (
+            'update',
+            TG_TABLE_NAME,
+            ${jsonBuildObject("OLD")},
+            ${jsonBuildObject("NEW")}
+        );
+    ELSIF (TG_OP = 'DELETE') THEN
+        INSERT INTO tight_analytics.event_log (
+            event_type,
+            row_table_name,
+            old_row,
+            new_row
+        ) VALUES (
+            'delete',
+            TG_TABLE_NAME,
+            ${jsonBuildObject("OLD")},
+            NULL
+        );
+    END IF;
+
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;`;
