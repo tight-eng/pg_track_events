@@ -1,13 +1,38 @@
 ---
-title: Hello World
-description: Your first document
+title: pg_track_events
+description: Emits analytics events as your data changes
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+# pg_track_events
 
-## What is Next?
+**Your database knows what happened — why aren’t you listening?**
 
-<Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.vercel.app" />
-</Cards>
+`pg_track_events` emits analytics events as your data changes. This repo has the tools you need to map row changes into analytics events, and then stream them to tools like PostHog, Mixpanel, Segment, and BigQuery. Every query you run tells you something about your app and users so stop throwing them away.
+
+### Features
+
+Reliable, accurate, backend analytics without a bunch of `.track()` code.
+
+🔄 **Emit events as your data changes** — no more duplicating logic across backend and tracking code.
+
+🛡️ **Secure and self-hosted** — runs in your VPC, no SaaS relay.
+
+🧠 **Semantic events, not raw logs** — transform DB changes into intelligible events with simple logic (Google CEL).
+
+⚡️ **Easy setup, then scalable** — start with Postgres triggers (1-3% slower writes[run benchmarks]), scale to WAL and replicas if needed.
+
+⏱️ **Time travel** — stop waiting for data because you forgot to track something. New analytic events can backfill their history by looking at WAL logs.
+
+### How it works
+
+[digram]
+
+### Quick Start
+
+### License
+
+MIT License
+
+---
+
+Created by [@acunnife](https://github.com/acunniffe) and [@svarlamov](https://github.com/svarlamov) to help them build better products.
