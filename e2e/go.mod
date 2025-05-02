@@ -1,4 +1,4 @@
-module github.com/tightdb/e2e
+module github.com/tight-eng/pg_track_events/e2e
 
 go 1.24.2
 
@@ -6,10 +6,10 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.37.0
-	github.com/typeeng/tight-agent v0.0.0
+	github.com/typeeng/pg_track_events/agent v0.0.0
 )
 
-replace github.com/typeeng/tight-agent => ../agent
+replace github.com/typeeng/pg_track_events/agent => ../agent
 
 require (
 	cel.dev/expr v0.23.1 // indirect

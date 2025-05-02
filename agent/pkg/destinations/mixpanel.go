@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/mixpanel/mixpanel-go"
-	"github.com/typeeng/tight-agent/internal/utils"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/internal/utils"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 // MixpanelDestination implements ProcessedEventDestination for sending events to Mixpanel

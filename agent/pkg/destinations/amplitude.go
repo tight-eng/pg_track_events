@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 // AmplitudeDestination implements ProcessedEventDestination for sending events to Amplitude

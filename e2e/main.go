@@ -18,8 +18,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/typeeng/tight-agent/pkg/agent"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/agent"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 type Scenario struct {

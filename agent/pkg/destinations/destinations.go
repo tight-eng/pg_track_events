@@ -3,7 +3,7 @@ package destinations
 import (
 	"context"
 
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 type ProcessedEventDestination interface {

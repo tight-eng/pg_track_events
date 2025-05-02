@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 const (

@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
-	"github.com/typeeng/tight-agent/internal/config"
-	"github.com/typeeng/tight-agent/pkg/celutils"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/internal/config"
+	"github.com/typeeng/pg_track_events/agent/pkg/celutils"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"

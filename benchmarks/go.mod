@@ -1,4 +1,4 @@
-module github.com/tight-eng/benchmarks
+module github.com/tight-eng/pg_track_events/benchmarks
 
 go 1.24.2
 

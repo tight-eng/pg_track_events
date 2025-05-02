@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/typeeng/tight-agent/internal/config"
-	"github.com/typeeng/tight-agent/internal/db"
-	"github.com/typeeng/tight-agent/internal/evtxfrm"
-	"github.com/typeeng/tight-agent/internal/logger"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
-	"github.com/typeeng/tight-agent/pkg/schemas"
+	"github.com/typeeng/pg_track_events/agent/internal/config"
+	"github.com/typeeng/pg_track_events/agent/internal/db"
+	"github.com/typeeng/pg_track_events/agent/internal/evtxfrm"
+	"github.com/typeeng/pg_track_events/agent/internal/logger"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/schemas"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

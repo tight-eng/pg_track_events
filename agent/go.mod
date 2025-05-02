@@ -1,4 +1,4 @@
-module github.com/typeeng/tight-agent
+module github.com/typeeng/pg_track_events/agent
 
 go 1.24.2
 

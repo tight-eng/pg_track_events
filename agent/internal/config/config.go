@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/typeeng/tight-agent/internal/env"
+	"github.com/typeeng/pg_track_events/agent/internal/env"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 	internalSchemaNameEnvKey        = "INTERNAL_SCHEMA_NAME"
 	eventLogTableNameEnvKey         = "EVENT_LOG_TABLE_NAME"
-	defaultInternalSchemaName       = "tight_analytics"
+	defaultInternalSchemaName       = "schema_pg_track_events"
 	defaultEventLogTableName        = "event_log"
 	defaultEventStreamingConfigPath = "pg_track_events.config.yaml"
 )
