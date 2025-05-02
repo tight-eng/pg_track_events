@@ -70,10 +70,78 @@ describe("verify CEL values", () => {
     const result = await verifyCELExpressions(parsedYaml);
     expect(result).toMatchInlineSnapshot(`
       {
-        "invalid": [],
-        "invalidCount": 0,
+        "invalid": [
+          {
+            "expr": "user.email",
+            "exprKind": "prop",
+            "operation": "insert",
+            "path": [
+              "users.insert",
+              "properties",
+              "email",
+            ],
+            "table": "users",
+            "valid": false,
+            "validationError": 
+      "CEL compilation error: ERROR: <input>:1:1: undeclared reference to 'user' (in container '')
+       | user.email
+       | ^"
+      ,
+          },
+          {
+            "expr": "user.name",
+            "exprKind": "prop",
+            "operation": "insert",
+            "path": [
+              "users.insert",
+              "properties",
+              "name",
+            ],
+            "table": "users",
+            "valid": false,
+            "validationError": 
+      "CEL compilation error: ERROR: <input>:1:1: undeclared reference to 'user' (in container '')
+       | user.name
+       | ^"
+      ,
+          },
+          {
+            "expr": "old.status != new.status && new.status == 'accepted' ? 'joined_org' : null",
+            "exprKind": "cond",
+            "operation": "update",
+            "path": [
+              "invitations.update",
+              "cond",
+            ],
+            "table": "invitations",
+            "valid": false,
+            "validationError": 
+      "CEL compilation error: ERROR: <input>:1:54: found no matching overload for '_?_:_' applied to '(bool, string, null)'
+       | old.status != new.status && new.status == 'accepted' ? 'joined_org' : null
+       | .....................................................^"
+      ,
+          },
+          {
+            "expr": "invitation.org_id",
+            "exprKind": "prop",
+            "operation": "update",
+            "path": [
+              "invitations.update",
+              "joined_org",
+              "org_id",
+            ],
+            "table": "invitations",
+            "valid": false,
+            "validationError": 
+      "CEL compilation error: ERROR: <input>:1:1: undeclared reference to 'invitation' (in container '')
+       | invitation.org_id
+       | ^"
+      ,
+          },
+        ],
+        "invalidCount": 4,
         "total": 4,
-        "validCount": 4,
+        "validCount": 0,
       }
     `)
   })

@@ -197,6 +197,7 @@ export async function verifyCELExpressions(
     table: string;
     operation: "insert" | "update" | "delete";
     expr: string;
+    events?: string[];
   }[] = [];
 
   Object.entries(config.track).forEach(([tablePath, eventConfig]) => {
@@ -217,6 +218,7 @@ export async function verifyCELExpressions(
         table: table,
         operation: operation,
         expr: condExpr,
+        events: Object.keys(eventConfig),
       });
 
       // Iterate through each event's properties

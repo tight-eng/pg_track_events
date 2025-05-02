@@ -21,8 +21,6 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ⚡️ **Easy setup, then scalable** — start with Postgres triggers (1-3% slower writes[run benchmarks]), scale to WAL and replicas if needed.
 
-⏱️ **Time travel** — stop waiting for data because you forgot to track something. New analytic events can backfill their history by looking at WAL logs.
-
 ### How it works
 
 [digram]
