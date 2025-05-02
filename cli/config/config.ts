@@ -69,11 +69,10 @@ export async function parseConfigFile(
     if (!skipCELValidation) {
       const celValidation = await verifyCELExpressions(
         parsedYaml,
-        introspectedSchema
+        applyIgnoresToSchema(introspectedSchema, parsedYaml.ignore || {})
       );
 
       for (const invalid of celValidation.invalid) {
-        console.log(["track", ...invalid.path]);
         const node = document.getIn(["track", ...invalid.path], true)!;
         const yamlNode = node as { range?: [number, number] };
         const startChar = yamlNode.range?.[0];
@@ -190,7 +189,8 @@ export async function verifyCELExpressions(
   config: z.infer<typeof analyticsConfigSchema>,
   introspectedSchema: DatabaseSchema = []
 ) {
-  const wasmlibValidateCELs = await initWasm();
+  const { wasmlibValidateCELs, wasmlibSetSchema } = await initWasm();
+  await wasmlibSetSchema(introspectedSchema);
   const pendingValidations: {
     path: string[];
     exprKind: "prop" | "cond";
@@ -262,7 +262,6 @@ export async function verifyCELExpressions(
   });
 
   const result = await wasmlibValidateCELs({
-    schema: applyIgnoresToSchema(introspectedSchema, config.ignore || {}),
     cels: pendingValidations,
   });
 
