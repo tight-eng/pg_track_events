@@ -190,25 +190,9 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
 
 async function createDockerFile(tightDir: string) {
   const dockerFile = `
-FROM golang:1.21
+FROM ghcr.io/tight-eng/tightdb/tight-agent:latest
 
-# Set the working directory inside the container
-WORKDIR /app
-
-# Copy go.mod and go.sum first (for caching)
-COPY go.mod go.sum ./
-
-# Download Go modules
-RUN go mod download
-
-# Copy the rest of the source code
-COPY . .
-
-# Build the Go application
-RUN go build -o app .
-
-# Command to run the executable
-CMD ["./app"]
+COPY tight-analytics.yaml .
 `.trimStart();
 
   await Bun.write(`${tightDir}/Dockerfile`, dockerFile);

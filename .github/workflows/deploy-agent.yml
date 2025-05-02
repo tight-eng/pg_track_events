@@ -1,9 +1,12 @@
-name: Build and Push Docker Image to GHCR
+name: Build and Push Agent Docker Image
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'agent/**'
+      - '.github/workflows/deploy-agent.yml'
   workflow_dispatch:
 
 jobs:
