@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/mixpanel/mixpanel-go"
+	"github.com/typeeng/tight-agent/internal/utils"
 	"github.com/typeeng/tight-agent/pkg/eventmodels"
 )
 
@@ -45,7 +46,7 @@ func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*
 		mixpanelEvents[i] = m.client.NewEvent(
 			event.Name,
 			event.GetDistinctId(""),
-			event.Properties,
+			utils.ShallowCopyMap(event.Properties),
 		)
 		// Best timestamp
 		mixpanelEvents[i].AddTime(event.Timestamp)

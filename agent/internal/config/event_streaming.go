@@ -31,11 +31,9 @@ type ConditionalEvent struct {
 	// Compiled CEL expression for the condition
 	CompiledCond   cel.Program
 	CondEventsPbFd protoreflect.FileDescriptor
-	Events         map[string]struct {
-		Properties map[string]string `yaml:"properties,omitempty"`
-		// Compiled CEL expressions for properties
-		CompiledProperties map[string]cel.Program
-	} `yaml:",inline"`
+	Events         map[string]map[string]string `yaml:",inline"`
+	// Compiled CEL expressions for properties for each event
+	CompiledEvents map[string]map[string]cel.Program
 }
 
 func (ce *ConditionalEvent) GetEventNames() []string {
@@ -92,6 +90,13 @@ type DestinationConfig struct {
 	// BigQuery specific configuration
 	TableID         string `yaml:"tableId,omitempty"`
 	CredentialsJSON string `yaml:"credentialsJson,omitempty"`
+	// S3 specific configuration
+	Bucket    string `yaml:"bucket,omitempty"`
+	Endpoint  string `yaml:"endpoint,omitempty"`
+	Region    string `yaml:"region,omitempty"`
+	RootDir   string `yaml:"rootDir,omitempty"`
+	AccessKey string `yaml:"accessKey,omitempty"`
+	SecretKey string `yaml:"secretKey,omitempty"`
 }
 
 type InitializedProcessedEventDestination struct {
@@ -126,6 +131,26 @@ func (dc *DestinationConfig) Validate(destKey string) error {
 		}
 		if dc.CredentialsJSON, err = env.ValueOrRequiredEnvVar(dc.CredentialsJSON); err != nil {
 			return fmt.Errorf("credentials JSON is required for BigQuery destination: %w", err)
+		}
+	} else if destKey == "s3" {
+		if dc.Bucket, err = env.ValueOrRequiredEnvVar(dc.Bucket); err != nil {
+			return fmt.Errorf("bucket is required for S3 destination: %w", err)
+		}
+		if dc.Region, err = env.ValueOrRequiredEnvVar(dc.Region); err != nil {
+			return fmt.Errorf("region is required for S3 destination: %w", err)
+		}
+		if dc.RootDir, err = env.ValueOrRequiredEnvVar(dc.RootDir); err != nil {
+			return fmt.Errorf("root directory is required for S3 destination: %w", err)
+		}
+		if dc.AccessKey, err = env.ValueOrRequiredEnvVar(dc.AccessKey); err != nil {
+			return fmt.Errorf("access key is required for S3 destination: %w", err)
+		}
+		if dc.SecretKey, err = env.ValueOrRequiredEnvVar(dc.SecretKey); err != nil {
+			return fmt.Errorf("secret key is required for S3 destination: %w", err)
+		}
+		// Endpoint is optional for S3
+		if dc.Endpoint != "" {
+			dc.Endpoint, _ = env.ValueOrRequiredEnvVar(dc.Endpoint)
 		}
 	} else if destKey == "mixpanel" {
 		if dc.ProjectToken, err = env.ValueOrRequiredEnvVar(dc.ProjectToken); err != nil {
@@ -265,13 +290,15 @@ func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.F
 				return fmt.Errorf("failed to compile condition for %s: %w", key, err)
 			}
 
+			// Initialize the compiled events map
+			ec.CompiledEvents = make(map[string]map[string]cel.Program)
+
 			// Compile properties for each event in ConditionalEvent
-			for eventName, event := range ec.Events {
-				event.CompiledProperties, err = compileProperties(env, event.Properties)
+			for eventName, eventProperties := range ec.Events {
+				ec.CompiledEvents[eventName], err = compileProperties(env, eventProperties)
 				if err != nil {
 					return fmt.Errorf("failed to compile properties for %s.%s: %w", key, eventName, err)
 				}
-				ec.Events[eventName] = event
 			}
 		}
 	}
@@ -319,6 +346,24 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Kind:        kind,
 				Filter:      destination.Filter,
 				Destination: bq,
+			})
+		case "s3":
+			s3, err := destinations.NewS3RawDBEventDestination(
+				destination.Bucket,
+				destination.Endpoint,
+				destination.Region,
+				destination.RootDir,
+				destination.AccessKey,
+				destination.SecretKey,
+				logger,
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create s3 destination: %w", err)
+			}
+			initializedDBDestinations = append(initializedDBDestinations, InitializedDBEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: s3,
 			})
 		default:
 			return nil, nil, fmt.Errorf("unknown raw db event destination type: %s", kind)
