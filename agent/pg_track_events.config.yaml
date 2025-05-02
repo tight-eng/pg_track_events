@@ -18,19 +18,15 @@ track:
   user.update:
     cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
     "user_changed_email":
-      event: "user_changed_email"
-      properties:
-        id: "new.id"
-        previous_email: "old.email"
-        new_email: "new.email"
+      id: "new.id"
+      previous_email: "old.email"
+      new_email: "new.email"
     "user_updated":
-      event: "user_updated"
-      properties:
-        id: "new.id"
-        email: "new.email"
-        name: "new.name"
-        # data: "new.data"
-        # data_inner: "new.data['inner']"
+      id: "new.id"
+      email: "new.email"
+      name: "new.name"
+      # data: "new.data"
+      # data_inner: "new.data['inner']"
 
 destinations:
   posthog:

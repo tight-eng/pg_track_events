@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
-	"github.com/typeeng/tight-agent/internal/config"
-	"github.com/typeeng/tight-agent/pkg/celutils"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/internal/config"
+	"github.com/typeeng/pg_track_events/agent/pkg/celutils"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -136,12 +136,12 @@ func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig
 		}
 
 		// Find the matching event based on the condition
-		event, exists := ec.Events[*selectedEventName]
+		eventProperties, exists := ec.CompiledEvents[*selectedEventName]
 		if !exists {
 			return nil, fmt.Errorf("selected event %s not found in event configuration", *selectedEventName)
 		}
 
-		properties, err := evaluateProperties(event.CompiledProperties, input)
+		properties, err := evaluateProperties(eventProperties, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate properties for conditional event %s: %w", *selectedEventName, err)
 		}

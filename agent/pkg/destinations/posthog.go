@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/posthog/posthog-go"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 // PostHogDestination implements ProcessedEventDestination for sending events to PostHog

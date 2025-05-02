@@ -204,9 +204,9 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
 
 async function createDockerFile(tightDir: string) {
   const dockerFile = `
-FROM ghcr.io/tight-eng/tightdb/tight-agent:latest
+FROM ghcr.io/tight-eng/pg_track_events/agent:latest
 
-COPY tight-analytics.yaml .
+COPY pg_track_events.config.yaml .
 `.trimStart();
 
   await Bun.write(`${tightDir}/Dockerfile`, dockerFile);

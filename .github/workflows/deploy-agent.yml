@@ -31,6 +31,6 @@ jobs:
         with:
           context: ./agent
           push: true
-          tags: ghcr.io/${{ github.repository }}/tight-agent:latest
+          tags: ghcr.io/${{ github.repository }}/agent:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

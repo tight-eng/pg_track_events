@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/typeeng/tight-agent/internal/config"
-	"github.com/typeeng/tight-agent/internal/db/queries"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
-	"github.com/typeeng/tight-agent/pkg/schemas"
+	"github.com/typeeng/pg_track_events/agent/internal/config"
+	"github.com/typeeng/pg_track_events/agent/internal/db/queries"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/schemas"
 )
 
 func NewDB(ctx context.Context) (*sql.DB, error) {

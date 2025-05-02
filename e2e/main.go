@@ -18,8 +18,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/typeeng/tight-agent/pkg/agent"
-	"github.com/typeeng/tight-agent/pkg/eventmodels"
+	"github.com/typeeng/pg_track_events/agent/pkg/agent"
+	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 )
 
 type Scenario struct {
@@ -84,7 +84,7 @@ func findScenarios(baseDir string) ([]Scenario, error) {
 
 		// Check if this directory contains a scenario
 		schemaPath := filepath.Join(path, "schema.sql")
-		configPath := filepath.Join(path, "tight.analytics.yaml")
+		configPath := filepath.Join(path, "pg_track_events.config.yaml")
 		eventsPath := filepath.Join(path, "db_events.jsonl")
 
 		if _, err := os.Stat(schemaPath); err != nil {
@@ -124,7 +124,7 @@ func runScenario(ctx context.Context, pool *pgxpool.Pool, scenario Scenario) err
 
 	// 2. Set up environment for agent
 	// Set the config file path in environment
-	os.Setenv("TIGHT_ANALYTICS_CONFIG_PATH", scenario.ConfigPath)
+	os.Setenv("EVENTS_CONFIG_PATH", scenario.ConfigPath)
 
 	// Set the database URL in environment
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
@@ -134,8 +134,8 @@ func runScenario(ctx context.Context, pool *pgxpool.Pool, scenario Scenario) err
 		pool.Config().ConnConfig.Port,
 		pool.Config().ConnConfig.Database,
 	)
-	log.Printf("Setting TIGHT_DATABASE_URL to: %s", dbURL)
-	os.Setenv("TIGHT_DATABASE_URL", dbURL)
+	log.Printf("Setting DATABASE_URL to: %s", dbURL)
+	os.Setenv("DATABASE_URL", dbURL)
 
 	// Run CLI init after database is ready
 	if err := runCLIInit(scenario.ConfigPath); err != nil {

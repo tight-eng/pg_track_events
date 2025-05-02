@@ -5,26 +5,26 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/typeeng/tight-agent/internal/env"
+	"github.com/typeeng/pg_track_events/agent/internal/env"
 )
 
 const (
-	databaseURLEnvKey         = "TIGHT_DATABASE_URL"
-	analyticsConfigPathEnvKey = "TIGHT_ANALYTICS_CONFIG_PATH"
+	databaseURLEnvKey         = "DATABASE_URL"
+	analyticsConfigPathEnvKey = "EVENTS_CONFIG_PATH"
 
-	batchSizeEnvKey      = "TIGHT_BATCH_SIZE"
-	fetchIntervalEnvKey  = "TIGHT_FETCH_INTERVAL"
+	batchSizeEnvKey      = "BATCH_SIZE"
+	fetchIntervalEnvKey  = "FETCH_INTERVAL"
 	defaultBatchSize     = 100
 	defaultFetchInterval = 5 * time.Second
 
-	defaultSchemaNameEnvKey = "TIGHT_DEFAULT_SCHEMA_NAME"
+	defaultSchemaNameEnvKey = "DEFAULT_SCHEMA_NAME"
 	defaultSchemaName       = "public"
 
-	internalSchemaNameEnvKey        = "TIGHT_INTERNAL_SCHEMA_NAME"
-	eventLogTableNameEnvKey         = "TIGHT_EVENT_LOG_TABLE_NAME"
-	defaultInternalSchemaName       = "tight_analytics"
+	internalSchemaNameEnvKey        = "INTERNAL_SCHEMA_NAME"
+	eventLogTableNameEnvKey         = "EVENT_LOG_TABLE_NAME"
+	defaultInternalSchemaName       = "schema_pg_track_events"
 	defaultEventLogTableName        = "event_log"
-	defaultEventStreamingConfigPath = "tight.analytics.yaml"
+	defaultEventStreamingConfigPath = "pg_track_events.config.yaml"
 )
 
 type AgentConfig struct {
@@ -76,7 +76,7 @@ func getDefaultConfig() *AgentConfig {
 
 	cfg.DatabaseURL = env.FirstOrDefault(cfg.DatabaseURL, databaseURLEnvKey)
 	if cfg.DatabaseURL == "" {
-		panic("TIGHT_DATABASE_URL is not set")
+		panic("DATABASE_URL is not set")
 	}
 
 	// Parse BatchSize from environment

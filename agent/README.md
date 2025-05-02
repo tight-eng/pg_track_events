@@ -15,7 +15,7 @@ The TightDB Agent is a service that processes database events from a PostgreSQL 
 Clone the repository:
 
 ```bash
-git clone https://github.com/typeeng/tight-agent.git
+git clone https://github.com/typeeng/pg_track_events/agent.git
 cd tight-agent
 ```
 

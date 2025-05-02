@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"syscall/js"
 
-	"github.com/typeeng/tight-agent/pkg/celutils"
-	"github.com/typeeng/tight-agent/pkg/schemas"
+	"github.com/typeeng/pg_track_events/agent/pkg/celutils"
+	"github.com/typeeng/pg_track_events/agent/pkg/schemas"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
