@@ -22,6 +22,18 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ### Quick Start
 
+```bash
+# TODO Run the CLI init command
+# TODO cd into the directory with the newly-generated Dockerfile and pg_track_events.config.yaml
+
+# Build image
+docker build -t pg_track_events_agent .
+
+# Run image (interactive mode, for testing)
+# The POSTHOG_API_KEY is just an example, you'll need to pass in whatever env vars you're referencing from your pg_track_events.config.yaml file
+docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_agent
+```
+
 ### License
 
 MIT License
