@@ -73,6 +73,18 @@
                             expr: 'old.email != new.email ? events.user_changed_email : null',
                             events: ['user_changed_email', 'user_updated']
                         },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'prop',
+                            expr: 'new.email',
+                        },
+                        {
+                            table: 'user',
+                            operation: 'insert',
+                            exprKind: 'prop',
+                            expr: 'new.THIS_FIELD_DOES_NOT_EXIST',
+                        }
                     ]
                 })
                 console.log('Validation result: ', wasmValidateResult)

@@ -35,7 +35,7 @@ func main() {
 	// Load configuration
 	cfg := config.ConfigFromContext(ctx)
 
-	logger.Logger().Info("loaded config", "track", len(cfg.EventStreamingConfig.Track), "destinations", len(cfg.EventStreamingConfig.Destinations))
+	logger.Logger().Info("loaded config", "track", len(cfg.EventStreamingConfig.Track), "destinations", len(cfg.EventStreamingConfig.Destinations), "ignore", len(cfg.EventStreamingConfig.Ignore))
 
 	// Connect to database
 	dbConn, err := db.NewDB(ctx)

@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/typeeng/tight-agent/internal/config"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -138,6 +139,49 @@ func (table *PostgresqlTableSchema) createMessageDescriptor() *descriptorpb.Desc
 	}
 
 	return msg
+}
+
+// ApplyIgnoresToSchema applies the ignores to the schema
+func (s PostgresqlTableSchemaList) ApplyIgnoresToSchema(ignore map[string]config.ColumnIgnoreConfig) PostgresqlTableSchemaList {
+	if len(ignore) == 0 {
+		return s
+	}
+
+	result := make(PostgresqlTableSchemaList, 0, len(s))
+	for _, table := range s {
+		// Extract table name without schema prefix if present
+		tableName := table.Name
+		if strings.Contains(tableName, ".") {
+			tableName = strings.SplitN(tableName, ".", 2)[1]
+		}
+
+		// Skip tables that are fully ignored
+		if config, exists := ignore[tableName]; exists && config.AllColumns {
+			continue
+		}
+
+		// Process tables with specific column ignores
+		if config, exists := ignore[tableName]; exists && len(config.Columns) > 0 {
+			// Create a map of ignored columns for faster lookup
+			ignoredColumns := make(map[string]struct{})
+			for _, col := range config.Columns {
+				ignoredColumns[col] = struct{}{}
+			}
+
+			// Filter out ignored columns
+			filteredColumns := make([]*PostgresqlTableColumn, 0, len(table.Columns))
+			for _, column := range table.Columns {
+				if _, ignored := ignoredColumns[column.Name]; !ignored {
+					filteredColumns = append(filteredColumns, column)
+				}
+			}
+			table.Columns = filteredColumns
+		}
+
+		result = append(result, table)
+	}
+
+	return result
 }
 
 // GeneratePbDescriptorForTables generates protobuf descriptors for all tables matching the given glob pattern

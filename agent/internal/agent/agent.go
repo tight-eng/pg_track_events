@@ -77,6 +77,9 @@ func (a *Agent) Start(ctx context.Context) error {
 
 		a.logger.Info("loaded schema", "tables", len(a.schema))
 
+		a.schema = a.schema.ApplyIgnoresToSchema(a.cfg.EventStreamingConfig.Ignore)
+		a.logger.Info("applied ignores to schema", "tables", len(a.schema))
+
 		a.schemaPbDescriptor, err = a.schema.GeneratePbDescriptorForTables(*a.schemaPbPkgName, fmt.Sprintf("%s.*", a.cfg.DefaultSchemaName))
 		if err != nil {
 			a.logger.Error("failed to generate protobuf descriptor", "error", err)

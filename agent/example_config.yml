@@ -42,3 +42,8 @@ destinations:
   amplitude:
     apiKey: "$AMPLITUDE_API_KEY"
     filter: "*"
+
+ignore:
+  auth_authenticator: "*" # This ignores all columns in the auth_authenticator table
+  auth_account: ["id_token", "refresh_token", "access_token"] # This ignores only specific columns in the auth_account table
+  auth_verification_token: ["token"] # This ignores only specific columns in the auth_verification_token table

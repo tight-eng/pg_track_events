@@ -114,10 +114,60 @@ func (dc *DestinationConfig) Validate() error {
 	return nil
 }
 
+// ColumnIgnoreConfig represents either all columns or specific columns to ignore
+type ColumnIgnoreConfig struct {
+	AllColumns bool
+	Columns    []string
+}
+
+// UnmarshalYAML implements custom unmarshaling for ColumnIgnoreConfig
+func (c *ColumnIgnoreConfig) UnmarshalYAML(value *yaml.Node) error {
+	// Handle string case (for "*")
+	if value.Kind == yaml.ScalarNode {
+		if value.Value == "*" {
+			c.AllColumns = true
+			return nil
+		}
+		return fmt.Errorf("invalid ignore value: must be '*' or an array of column names")
+	}
+
+	// Handle array case
+	if value.Kind == yaml.SequenceNode {
+		columns := make([]string, len(value.Content))
+		for i, node := range value.Content {
+			if node.Kind != yaml.ScalarNode {
+				return fmt.Errorf("column name must be a string")
+			}
+			columns[i] = node.Value
+		}
+		c.Columns = columns
+		return nil
+	}
+
+	return fmt.Errorf("invalid ignore configuration: must be '*' or an array of column names")
+}
+
+// IgnoreConfig represents the configuration for ignoring specific columns in tables
+type IgnoreConfig map[string]ColumnIgnoreConfig
+
+// Validate performs validation on the ignore configuration
+func (ic IgnoreConfig) Validate() error {
+	for tableName, config := range ic {
+		if config.AllColumns && len(config.Columns) > 0 {
+			return fmt.Errorf("invalid ignore configuration for table %s: cannot specify both '*' and specific columns", tableName)
+		}
+		if !config.AllColumns && len(config.Columns) == 0 {
+			return fmt.Errorf("invalid ignore configuration for table %s: must specify either '*' or specific columns", tableName)
+		}
+	}
+	return nil
+}
+
 // EventStreamingConfig is the root configuration structure
 type EventStreamingConfig struct {
 	Track        TrackingConfig               `yaml:"track"`
 	Destinations map[string]DestinationConfig `yaml:"destinations,omitempty"`
+	Ignore       IgnoreConfig                 `yaml:"ignore,omitempty"`
 }
 
 // compileProperties compiles CEL expressions for a map of properties
@@ -199,6 +249,11 @@ func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.F
 		}
 		// Update the original map with any changes made during validation
 		esc.Destinations[destKey] = dest
+	}
+
+	// Validate ignore configuration
+	if err := esc.Ignore.Validate(); err != nil {
+		return fmt.Errorf("ignore configuration validation failed: %w", err)
 	}
 
 	return nil
