@@ -10,21 +10,22 @@ declare global {
   }
 
   function wasmlibValidateCELs(input: {
-    schema: any;
     cels: Array<{
       table: string;
       operation: string;
       exprKind: string;
       expr: string;
     }>;
-  }): any;
+  }): Promise<any>;
+
+  function wasmlibSetSchema(schema: any[] | null): Promise<void>;
 }
 
 let wasmInitialized = false;
 
 export async function initWasm() {
   if (wasmInitialized) {
-    return wasmlibValidateCELs
+    return { wasmlibValidateCELs, wasmlibSetSchema };
   }
 
   const go = new Go(); // Provided by wasm_exec.js
@@ -37,5 +38,5 @@ export async function initWasm() {
   go.run(result.instance);
 
   wasmInitialized = true;
-  return wasmlibValidateCELs
-} 
+  return { wasmlibValidateCELs, wasmlibSetSchema };
+}
