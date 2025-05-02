@@ -1,0 +1,8 @@
+{"id": 1, "event_type": "insert", "row_table_name": "users", "logged_at": "2024-05-01T12:00:00Z", "new_row": {"name": "John Doe", "email": "john@example.com"}}
+{"id": 2, "event_type": "insert", "row_table_name": "users", "logged_at": "2024-05-01T12:01:00Z", "new_row": {"name": "Jane Smith", "email": "jane@example.com"}}
+{"id": 3, "event_type": "insert", "row_table_name": "orders", "logged_at": "2024-05-01T12:02:00Z", "new_row": {"user_id": 1, "amount": 100.50, "status": "pending"}}
+{"id": 4, "event_type": "insert", "row_table_name": "orders", "logged_at": "2024-05-01T12:03:00Z", "new_row": {"user_id": 2, "amount": 200.75, "status": "pending"}}
+{"id": 5, "event_type": "update", "row_table_name": "orders", "logged_at": "2024-05-01T12:04:00Z", "old_row": {"id": 1, "user_id": 1, "amount": 100.50, "status": "pending"}, "new_row": {"id": 1, "user_id": 1, "amount": 100.50, "status": "completed"}}
+{"id": 6, "event_type": "update", "row_table_name": "orders", "logged_at": "2024-05-01T12:05:00Z", "old_row": {"id": 2, "user_id": 2, "amount": 200.75, "status": "pending"}, "new_row": {"id": 2, "user_id": 2, "amount": 200.75, "status": "cancelled"}}
+{"id": 7, "event_type": "delete", "row_table_name": "orders", "logged_at": "2024-05-01T12:06:00Z", "old_row": {"id": 1, "user_id": 1, "amount": 100.50, "status": "completed"}}
+{"id": 8, "event_type": "delete", "row_table_name": "users", "logged_at": "2024-05-01T12:07:00Z", "old_row": {"id": 1, "name": "John Doe", "email": "john@example.com"}} 

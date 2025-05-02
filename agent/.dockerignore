@@ -1,4 +1,4 @@
 *.env*
 bigquery_db_events_table.json
 bigquery_processed_events_table.json
-example_config.yml
+tight.analytics.yaml

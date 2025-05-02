@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/typeeng/tight-agent/internal/config"
+	"github.com/typeeng/tight-agent/internal/db/queries"
 	"github.com/typeeng/tight-agent/pkg/eventmodels"
 	"github.com/typeeng/tight-agent/pkg/schemas"
 )
@@ -27,7 +27,7 @@ func NewDB(ctx context.Context) (*sql.DB, error) {
 // using SELECT FOR UPDATE SKIP LOCKED to implement a queue pattern.
 // It returns the events and the active transaction which must be committed
 // or rolled back by the caller.
-func FetchDBEvents(ctx context.Context, db *sql.DB) ([]eventmodels.DBEvent, *sql.Tx, error) {
+func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sql.Tx, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -53,7 +53,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]eventmodels.DBEvent, *sql
 	}
 	defer rows.Close()
 
-	var events []eventmodels.DBEvent
+	var events []*eventmodels.DBEvent
 	for rows.Next() {
 		var event eventmodels.DBEvent
 		var eventTypeStr string
@@ -81,7 +81,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]eventmodels.DBEvent, *sql
 			event.NewRow = json.RawMessage(newRow.String)
 		}
 
-		events = append(events, event)
+		events = append(events, &event)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -123,14 +123,8 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 
 // GetSchema retrieves the database schema using the provided SQL query
 func GetSchema(ctx context.Context, db *sql.DB) (schemas.PostgresqlTableSchemaList, error) {
-	// Read the SQL query from the file
-	query, err := os.ReadFile("introspect_pg.sql")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read schema query: %w", err)
-	}
-
-	// Execute the query
-	rows, err := db.QueryContext(ctx, string(query))
+	// Execute the query using the embedded SQL content
+	rows, err := db.QueryContext(ctx, queries.IntrospectSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute schema query: %w", err)
 	}

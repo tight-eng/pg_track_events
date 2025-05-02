@@ -1,0 +1,38 @@
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Unique ID of the event record"
+    },
+    {
+        "name": "event_type",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Type of operation: insert, update, delete"
+    },
+    {
+        "name": "row_table_name",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Name of the table the event occurred on"
+    },
+    {
+        "name": "old_row",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "Old row data"
+    },
+    {
+        "name": "new_row",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "New row data"
+    },
+    {
+        "name": "logged_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp that represents when the event was observed"
+    }
+]

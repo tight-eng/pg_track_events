@@ -12,6 +12,7 @@ import (
 	"github.com/typeeng/tight-agent/internal/env"
 	"github.com/typeeng/tight-agent/pkg/celutils"
 	"github.com/typeeng/tight-agent/pkg/destinations"
+	"github.com/typeeng/tight-agent/pkg/eventmodels"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"gopkg.in/yaml.v3"
 )
@@ -99,6 +100,12 @@ type InitializedProcessedEventDestination struct {
 	Destination destinations.ProcessedEventDestination
 }
 
+type InitializedDBEventDestination struct {
+	Kind        string
+	Filter      string
+	Destination destinations.DBEventDestination
+}
+
 // Validate checks if the APIKey is in the correct format
 func (dc *DestinationConfig) Validate(destKey string) error {
 	var err error
@@ -128,6 +135,8 @@ func (dc *DestinationConfig) Validate(destKey string) error {
 		if dc.APIKey, err = env.ValueOrRequiredEnvVar(dc.APIKey); err != nil {
 			return fmt.Errorf("API key is required for %s destination: %w", destKey, err)
 		}
+	} else if destKey == "e2e_test_processed_events" || destKey == "e2e_test_db_events" {
+		return nil
 	} else {
 		return fmt.Errorf("unknown destination type: %s", destKey)
 	}
@@ -185,9 +194,14 @@ func (ic IgnoreConfig) Validate() error {
 
 // EventStreamingConfig is the root configuration structure
 type EventStreamingConfig struct {
-	Track        TrackingConfig               `yaml:"track"`
-	Destinations map[string]DestinationConfig `yaml:"destinations,omitempty"`
-	Ignore       IgnoreConfig                 `yaml:"ignore,omitempty"`
+	Track                  TrackingConfig               `yaml:"track"`
+	Destinations           map[string]DestinationConfig `yaml:"destinations,omitempty"`
+	RawDBEventDestinations map[string]DestinationConfig `yaml:"raw_db_event_destinations,omitempty"`
+	Ignore                 IgnoreConfig                 `yaml:"ignore,omitempty"`
+
+	// For testing
+	E2eProcessedEventChan chan<- *eventmodels.ProcessedEvent
+	E2eDBEventChan        chan<- *eventmodels.DBEvent
 }
 
 // compileProperties compiles CEL expressions for a map of properties
@@ -271,6 +285,14 @@ func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.F
 		esc.Destinations[destKey] = dest
 	}
 
+	for destKey, dest := range esc.RawDBEventDestinations {
+		if err := dest.Validate(destKey); err != nil {
+			return fmt.Errorf("raw db event destination validation failed: %w", err)
+		}
+		// Update the original map with any changes made during validation
+		esc.RawDBEventDestinations[destKey] = dest
+	}
+
 	// Validate ignore configuration
 	if err := esc.Ignore.Validate(); err != nil {
 		return fmt.Errorf("ignore configuration validation failed: %w", err)
@@ -279,15 +301,51 @@ func (esc *EventStreamingConfig) Validate(pbPkgName *string, pbFd protoreflect.F
 	return nil
 }
 
-func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger) ([]InitializedProcessedEventDestination, error) {
+func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger) ([]InitializedProcessedEventDestination, []InitializedDBEventDestination, error) {
 	initializedDestinations := make([]InitializedProcessedEventDestination, 0, len(esc.Destinations))
+	initializedDBDestinations := make([]InitializedDBEventDestination, 0, len(esc.RawDBEventDestinations))
+	for kind, destination := range esc.RawDBEventDestinations {
+		switch kind {
+		case "bigquery":
+			bq, err := destinations.NewBigQueryRawDBEventDestination(
+				destination.CredentialsJSON,
+				destination.TableID,
+				logger,
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create bigquery destination: %w", err)
+			}
+			initializedDBDestinations = append(initializedDBDestinations, InitializedDBEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: bq,
+			})
+		default:
+			return nil, nil, fmt.Errorf("unknown raw db event destination type: %s", kind)
+		}
+	}
+
 	for kind, destination := range esc.Destinations {
 		switch kind {
+		case "e2e_test_processed_events":
+			e2eDest := destinations.NewTestProcessedEventDestination(esc.E2eProcessedEventChan)
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: e2eDest,
+			})
+		case "e2e_test_db_events":
+			e2eDest := destinations.NewTestDBEventDestination(esc.E2eDBEventChan)
+			initializedDBDestinations = append(initializedDBDestinations, InitializedDBEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: e2eDest,
+			})
 		case "mixpanel":
 			// TODO Review additional config options
 			mp, err := destinations.NewMixpanelDestination(destination.ProjectToken, logger)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
+				return nil, nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
 			}
 			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
 				Kind:        kind,
@@ -298,7 +356,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 			// TODO Pull endpoint from config
 			ph, err := destinations.NewPostHogDestination(destination.APIKey, "https://us.i.posthog.com", logger)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create posthog destination: %w", err)
+				return nil, nil, fmt.Errorf("failed to create posthog destination: %w", err)
 			}
 			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
 				Kind:        kind,
@@ -309,7 +367,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 			// TODO Pull endpoint from config
 			amp, err := destinations.NewAmplitudeDestination(destination.APIKey, "https://api2.amplitude.com", logger)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create amplitude destination: %w", err)
+				return nil, nil, fmt.Errorf("failed to create amplitude destination: %w", err)
 			}
 			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
 				Kind:        kind,
@@ -323,7 +381,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				logger,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create bigquery destination: %w", err)
+				return nil, nil, fmt.Errorf("failed to create bigquery destination: %w", err)
 			}
 			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
 				Kind:        kind,
@@ -331,10 +389,10 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Destination: bq,
 			})
 		default:
-			return nil, fmt.Errorf("unknown destination type: %s", kind)
+			return nil, nil, fmt.Errorf("unknown destination type: %s", kind)
 		}
 	}
-	return initializedDestinations, nil
+	return initializedDestinations, initializedDBDestinations, nil
 }
 
 // ParseEventStreamingConfig parses and validates a YAML configuration

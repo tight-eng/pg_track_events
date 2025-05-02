@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	databaseURLEnvKey              = "TIGHT_DATABASE_URL"
-	eventStreamingConfigPathEnvKey = "TIGHT_EVENT_STREAMING_CONFIG_PATH"
+	databaseURLEnvKey         = "TIGHT_DATABASE_URL"
+	analyticsConfigPathEnvKey = "TIGHT_ANALYTICS_CONFIG_PATH"
 
 	batchSizeEnvKey      = "TIGHT_BATCH_SIZE"
 	fetchIntervalEnvKey  = "TIGHT_FETCH_INTERVAL"
@@ -24,7 +24,7 @@ const (
 	eventLogTableNameEnvKey         = "TIGHT_EVENT_LOG_TABLE_NAME"
 	defaultInternalSchemaName       = "tight_analytics"
 	defaultEventLogTableName        = "event_log"
-	defaultEventStreamingConfigPath = "config.yml"
+	defaultEventStreamingConfigPath = "tight.analytics.yaml"
 )
 
 type AgentConfig struct {
@@ -76,7 +76,7 @@ func getDefaultConfig() *AgentConfig {
 
 	cfg.DatabaseURL = env.FirstOrDefault(cfg.DatabaseURL, databaseURLEnvKey)
 	if cfg.DatabaseURL == "" {
-		panic("DATABASE_URL is not set")
+		panic("TIGHT_DATABASE_URL is not set")
 	}
 
 	// Parse BatchSize from environment
@@ -97,7 +97,7 @@ func getDefaultConfig() *AgentConfig {
 	cfg.InternalSchemaName = env.FirstOrDefault(cfg.InternalSchemaName, internalSchemaNameEnvKey)
 	cfg.EventLogTableName = env.FirstOrDefault(cfg.EventLogTableName, eventLogTableNameEnvKey)
 
-	cfg.EventStreamingConfig, err = ParseEventStreamingConfig(env.FirstOrDefault(defaultEventStreamingConfigPath, eventStreamingConfigPathEnvKey))
+	cfg.EventStreamingConfig, err = ParseEventStreamingConfig(env.FirstOrDefault(defaultEventStreamingConfigPath, analyticsConfigPathEnvKey))
 	if err != nil {
 		panic(err)
 	}

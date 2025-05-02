@@ -49,7 +49,7 @@ type Table = {
 export type DatabaseSchema = Table[];
 
 export async function getIntrospectedSchema(sql: SQL): Promise<DatabaseSchema> {
-  const result = await sql.file("../agent/introspect_pg.sql");
+  const result = await sql.file("../agent/internal/db/queries/introspect_pg.sql");
   return JSON.parse(result[0].schema_json);
 }
 

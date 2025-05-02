@@ -47,6 +47,12 @@ destinations:
     tableId: "$BIGQUERY_TABLE_ID"
     credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
 
+raw_db_event_destinations:
+  bigquery:
+    filter: "*"
+    tableId: "$BIGQUERY_RAW_DB_EVENTS_TABLE_ID"
+    credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
+
 ignore:
   auth_authenticator: "*" # This ignores all columns in the auth_authenticator table
   auth_account: ["id_token", "refresh_token", "access_token"] # This ignores only specific columns in the auth_account table

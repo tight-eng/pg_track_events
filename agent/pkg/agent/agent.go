@@ -27,9 +27,24 @@ type Agent struct {
 	schemaPbPkgName            *string
 	strictSchema               bool
 	processedEventDestinations []config.InitializedProcessedEventDestination
+	dbEventDestinations        []config.InitializedDBEventDestination
 }
 
-func NewAgent(ctx context.Context, db *sql.DB) (*Agent, error) {
+type AgentOption func(*Agent)
+
+func WithE2EProcessedEventChan(ch chan<- *eventmodels.ProcessedEvent) AgentOption {
+	return func(a *Agent) {
+		a.cfg.EventStreamingConfig.E2eProcessedEventChan = ch
+	}
+}
+
+func WithE2EDBEventChan(ch chan<- *eventmodels.DBEvent) AgentOption {
+	return func(a *Agent) {
+		a.cfg.EventStreamingConfig.E2eDBEventChan = ch
+	}
+}
+
+func NewAgent(ctx context.Context, db *sql.DB, opts ...AgentOption) (*Agent, error) {
 	cfg := config.ConfigFromContext(ctx)
 	logger := logger.Logger()
 
@@ -41,12 +56,16 @@ func NewAgent(ctx context.Context, db *sql.DB) (*Agent, error) {
 		strictSchema:    true,
 	}
 
-	initializedDestinations, err := a.cfg.EventStreamingConfig.GetInitializedDestinations(logger)
+	for _, opt := range opts {
+		opt(a)
+	}
+
+	initializedDestinations, initializedDBDestinations, err := a.cfg.EventStreamingConfig.GetInitializedDestinations(logger)
 	if err != nil {
 		return nil, err
 	}
 	a.processedEventDestinations = initializedDestinations
-
+	a.dbEventDestinations = initializedDBDestinations
 	return a, nil
 }
 
@@ -145,7 +164,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 	for i, dbEvent := range dbEvents {
 		eventIds[i] = dbEvent.ID
 		// Process event with protobuf support
-		processedEvent, err := evtxfrm.ProcessEvent(&dbEvent, a.cfg.EventStreamingConfig, a.schemaPbPkgName, a.schemaPbDescriptor)
+		processedEvent, err := evtxfrm.ProcessEvent(dbEvent, a.cfg.EventStreamingConfig, a.schemaPbPkgName, a.schemaPbDescriptor)
 		if err != nil {
 			a.logger.Error("failed to process event", "error", err)
 			// TODO Think about how to handle retries, etc.
@@ -175,6 +194,14 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 		a.logger.Info("no events to send to destinations (all raw events excluded)")
 	}
 
+	a.logger.Info("sending db events to destinations", "count", len(dbEvents))
+	if err := a.sendDBEvents(ctx, dbEvents); err != nil {
+		tx.Rollback()
+		a.logger.Error("failed to send db events to destinations", "error", err)
+		return false, err
+	}
+	a.logger.Info("successfully sent db events to destinations", "count", len(dbEvents))
+
 	// Flush all processed events, including excluded ones
 	a.logger.Info("flushing processed events", "count", len(eventIds))
 	if err := db.FlushDBEvents(ctx, tx, eventIds); err != nil {
@@ -189,11 +216,10 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 }
 
 func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.ProcessedEvent) error {
-	a.logger.Info("sending events to destinations", "count", len(events))
 	for _, destination := range a.processedEventDestinations {
 		filteredEvents := events
 		if destination.Filter != "*" {
-			filteredEvents = a.filterEvents(events, destination.Filter)
+			filteredEvents = a.filterProcessedEvents(events, destination.Filter)
 		}
 		if len(filteredEvents) == 0 {
 			a.logger.Info("after applying filter, no events to send to destination", "destination", destination.Destination)
@@ -209,10 +235,46 @@ func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.P
 	return nil
 }
 
-func (a *Agent) filterEvents(events []*eventmodels.ProcessedEvent, filter string) []*eventmodels.ProcessedEvent {
+func (a *Agent) sendDBEvents(ctx context.Context, events []*eventmodels.DBEvent) error {
+	for _, destination := range a.dbEventDestinations {
+		filteredEvents := events
+		if destination.Filter != "*" {
+			filteredEvents = a.filterDBEvents(events, destination.Filter)
+		}
+		if len(filteredEvents) == 0 {
+			a.logger.Info("after applying filter, no events to send to destination", "destination", destination.Destination)
+			continue
+		}
+		a.logger.Info("sending events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+		if err := destination.Destination.SendBatch(ctx, filteredEvents); err != nil {
+			a.logger.Error("failed to send events to destination", "error", err)
+			return err
+		}
+		a.logger.Info("successfully sent events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+	}
+	return nil
+}
+
+func (a *Agent) filterProcessedEvents(events []*eventmodels.ProcessedEvent, filter string) []*eventmodels.ProcessedEvent {
 	filteredEvents := make([]*eventmodels.ProcessedEvent, 0, len(events))
 	for _, event := range events {
 		matched, err := filepath.Match(filter, event.Name)
+		if err != nil {
+			// If the pattern is invalid, skip filtering for this event (error should've been caught by Validate)
+			a.logger.Error("(unexpected, skipping event) invalid destination filter pattern", "error", err)
+			continue
+		}
+		if matched {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+	return filteredEvents
+}
+
+func (a *Agent) filterDBEvents(events []*eventmodels.DBEvent, filter string) []*eventmodels.DBEvent {
+	filteredEvents := make([]*eventmodels.DBEvent, 0, len(events))
+	for _, event := range events {
+		matched, err := filepath.Match(filter, event.RowTableName)
 		if err != nil {
 			// If the pattern is invalid, skip filtering for this event (error should've been caught by Validate)
 			a.logger.Error("(unexpected, skipping event) invalid destination filter pattern", "error", err)

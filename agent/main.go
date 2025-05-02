@@ -8,10 +8,10 @@ import (
 	"syscall"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/typeeng/tight-agent/internal/agent"
 	"github.com/typeeng/tight-agent/internal/config"
 	"github.com/typeeng/tight-agent/internal/db"
 	"github.com/typeeng/tight-agent/internal/logger"
+	"github.com/typeeng/tight-agent/pkg/agent"
 
 	_ "github.com/joho/godotenv/autoload"
 )

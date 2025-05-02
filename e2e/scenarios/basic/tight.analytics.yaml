@@ -1,0 +1,58 @@
+track:
+  users.insert:
+    event: "user_signup"
+    properties:
+      id: "new.id"
+      email: "new.email"
+      name: "new.name"
+
+  users.update:
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    "user_changed_email":
+      event: "user_changed_email"
+      properties:
+        id: "new.id"
+        previous_email: "old.email"
+        new_email: "new.email"
+    "user_updated":
+      event: "user_updated"
+      properties:
+        id: "new.id"
+        email: "new.email"
+        name: "new.name"
+
+  users.delete:
+    event: "user_deleted"
+    properties:
+      id: "old.id"
+      email: "old.email"
+      name: "old.name"
+
+  orders.insert:
+    event: "order_created"
+    properties:
+      id: "new.id"
+      user_id: "new.user_id"
+      amount: "new.amount"
+      status: "new.status"
+
+  orders.update:
+    event: "order_updated"
+    properties:
+      id: "new.id"
+      status: "new.status"
+      previous_status: "old.status"
+
+  orders.delete:
+    event: "order_deleted"
+    properties:
+      id: "old.id"
+      user_id: "old.user_id"
+      amount: "old.amount"
+      status: "old.status"
+
+destinations:
+  e2e_test_processed_events:
+    filter: "*"
+  e2e_test_db_events:
+    filter: "*"
