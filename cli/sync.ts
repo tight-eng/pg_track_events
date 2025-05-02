@@ -11,9 +11,15 @@ import { IgnoreConfig } from "./config/yaml-schema";
 import { addToIgnore } from "./config/yaml-utils";
 import path from "path";
 import {
-  extractExcludedColumns,
+  extractColumnsFromFunction,
   logChangesBuilder,
 } from "./sql_functions/log-changes-builder";
+import {
+  getColumnsForTable,
+  getIntrospectedSchema,
+  getTableNames,
+} from "./config/introspection";
+import { difference, isEqual } from "./sql_functions/set-utils";
 const { MultiSelect, Input } = require("enquirer");
 
 export async function addTriggersForNewTables(
@@ -25,6 +31,8 @@ export async function addTriggersForNewTables(
 ) {
   const sqlBuilder = new SQLBuilder(sql);
 
+  const introspectedSchema = await getIntrospectedSchema(sql);
+
   const spinner = ora(
     "Scanning for new tables and and triggers that need to be updated..."
   ).start();
@@ -33,20 +41,14 @@ export async function addTriggersForNewTables(
     .filter(([_, value]) => value === "*")
     .map(([table]) => table);
 
-  // Get all tables in the public schema
-  const result = await sql`
-    SELECT table_name 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public'
-  `;
-
-  const tables = result.map((row: { table_name: string }) => row.table_name);
+  const tables = getTableNames(introspectedSchema);
 
   // Get tables that don't have triggers
   const tablesWithoutTriggers = [];
   const tablesWithTriggers = [];
   const ignoredTablesWithoutTriggers = [];
   const tablesWithUpdatedTriggers = [];
+
   for (const table of tables) {
     const triggerExists = await sql`
       SELECT 
@@ -70,39 +72,54 @@ export async function addTriggersForNewTables(
         ignoredTablesWithoutTriggers.push(table);
       }
     } else {
-      // @todo figure out how to support trigger body changing // being updated
-      // check if ignored has changed
-      if (ignoreConfig[table] && ignoreConfig[table] !== "*") {
-        const ignoredCols = extractExcludedColumns(
-          triggerExists[0].function_definition
-        );
-        const shouldIgnoreCols = new Set(ignoreConfig[table]);
-        // Check if the ignored columns have changed
-        const areSetsDifferent =
-          ignoredCols.size !== shouldIgnoreCols.size ||
-          [...ignoredCols].some((col) => !shouldIgnoreCols.has(col)) ||
-          [...shouldIgnoreCols].some((col) => !ignoredCols.has(col));
+      tablesWithTriggers.push(table);
+      // fully ignored tables will have triggers removed further down.
+      if (!fullyIgnoredTables.includes(table) && ignoreConfig[table] !== "*") {
+        const currentFunction = triggerExists[0].function_definition;
 
-        if (areSetsDifferent) {
-          // Stage a new function with updated ignored columns
-          const [functionName, functionBody] = logChangesBuilder(table, [
-            ...shouldIgnoreCols,
-          ]);
+        const currentIncludedColumns =
+          extractColumnsFromFunction(currentFunction);
+
+        const currentIgnoredColumns: string[] = ignoreConfig[table] || [];
+        const currentTableColumns = getColumnsForTable(
+          introspectedSchema,
+          table
+        );
+
+        const includedColumns = difference(
+          currentTableColumns,
+          new Set(currentIgnoredColumns)
+        );
+
+        if (!isEqual(includedColumns, currentIncludedColumns)) {
+          const [functionName, functionBody] = logChangesBuilder(
+            table,
+            Array.from(includedColumns)
+          );
+
+          const removed = Array.from(
+            difference(includedColumns, currentIncludedColumns)
+          ).sort();
+          const added = Array.from(
+            difference(currentIncludedColumns, includedColumns)
+          ).sort();
+
           tablesWithUpdatedTriggers.push(table);
           sqlBuilder.add(
             functionBody,
             `${kleur.dim("~")} ${kleur.bold(functionName)} ${kleur.dim(
-              "function updated with new ignored columns for"
+              `function updated.${
+                removed.length ? ` Removed (-${removed.join(", ")})` : ""
+              }${removed.length && added.length ? " and" : ""}${
+                added.length ? ` added (+${added.join(", ")})` : ""
+              } ignored columns for`
             )} ${kleur.bold(table)} table`
           );
         }
       }
-
-      tablesWithTriggers.push(table);
     }
   }
 
-  // to remove
   // Remove triggers for fully ignored tables that have triggers
   let toRemoveCount = 0;
   for (const table of fullyIgnoredTables) {
@@ -173,7 +190,17 @@ export async function addTriggersForNewTables(
 
   // Add triggers for each selected table
   for (const table of selectedTables) {
-    const [functionName, functionBody] = logChangesBuilder(table, []);
+    // Get ignored columns for this table from the config
+    const ignoredColumns = ignoreConfig[table] || [];
+    const tableColumns = getColumnsForTable(introspectedSchema, table);
+
+    const includedColumns = difference(tableColumns, new Set(ignoredColumns));
+
+    const [functionName, functionBody] = logChangesBuilder(
+      table,
+      Array.from(includedColumns)
+    );
+
     sqlBuilder.add(
       functionBody,
       `${kleur.dim("+")} ${kleur.bold(functionName)} ${kleur.dim(
@@ -182,9 +209,9 @@ export async function addTriggersForNewTables(
     );
     sqlBuilder.add(
       `CREATE TRIGGER ${table}_audit_trigger
-        AFTER INSERT OR UPDATE OR DELETE ON public.${table}
-        FOR EACH ROW
-        EXECUTE FUNCTION ${schemaName}.log_table_changes();`,
+      AFTER INSERT OR UPDATE OR DELETE ON public.${table}
+      FOR EACH ROW
+      EXECUTE FUNCTION ${functionName}();`,
       `${kleur.dim("+")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(
         "trigger on"
       )} ${kleur.bold(table)} ${kleur.dim("table")}`

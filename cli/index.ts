@@ -112,6 +112,7 @@ program
           "Validated! Deploy this config in an analytics agent to capture defined events."
         )
       );
+      process.exit(0);
     } else if (config.error.length > 0) {
       spinner.fail(
         kleur.red(`${config.error.length} validation errors found.`)

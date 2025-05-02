@@ -92,3 +92,28 @@ export function applyIgnoresToSchema(
     return true;
   });
 }
+export function getTableNames(schema: DatabaseSchema): string[] {
+  return schema
+    .filter((table) => table.name.startsWith("public."))
+    .map((table) => table.name.split(".")[1]);
+}
+
+export function getColumnsForTable(
+  schema: DatabaseSchema,
+  tableName: string
+): Set<string> {
+  // Normalize the table name to handle both with and without schema prefix
+  const normalizedTableName = tableName.startsWith("public.")
+    ? tableName
+    : `public.${tableName}`;
+
+  // Find the table in the schema
+  const table = schema.find(
+    (t) => t.name === normalizedTableName || t.name === tableName
+  );
+
+  if (!table) {
+    return new Set<string>();
+  }
+  return new Set(table.columns.map((column) => column.name));
+}

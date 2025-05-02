@@ -5,12 +5,18 @@ import kleur from "kleur";
 import { SQLBuilder } from "./sql_functions/sql-builder";
 import { parseDocument } from "yaml";
 import { logChangesBuilder } from "./sql_functions/log-changes-builder";
+import {
+  getColumnsForTable,
+  getIntrospectedSchema,
+} from "./config/introspection";
 const { MultiSelect, Input } = require("enquirer");
 //constants
 export const schemaName: string = "tight_analytics" as const;
 
 export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   const sqlBuilder = new SQLBuilder(sql);
+
+  const introspectedSchema = await getIntrospectedSchema(sql);
 
   // Get all tables in the public schema
   const tableQuery =
@@ -95,7 +101,13 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   // Add triggers for each table with progress indicator
 
   for (const table of selectedTables) {
-    const [functionName, functionBody] = logChangesBuilder(table, []);
+    const allColumnNames = getColumnsForTable(introspectedSchema, table);
+
+    const [functionName, functionBody] = logChangesBuilder(
+      table,
+      Array.from(allColumnNames)
+    );
+    console.log(functionBody);
     sqlBuilder.add(
       functionBody,
       `${kleur.dim("+")} ${kleur.bold(functionName)} ${kleur.dim(

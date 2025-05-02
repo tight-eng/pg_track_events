@@ -4,10 +4,10 @@ export function tableNameToAuditFunctionName(tableName: string) {
 
 export function logChangesBuilder(
   tableName: string,
-  excludedColumns: string[]
+  includedColumns: string[]
 ) {
-  const exceptClause =
-    excludedColumns.length > 0 ? `EXCEPT (${excludedColumns.join(", ")})` : "";
+  const columnsClause =
+    includedColumns.length > 0 ? `(${includedColumns.sort().join(", ")})` : "*";
 
   const functionName = tableNameToAuditFunctionName(tableName);
   const functionBody = `-- Generic trigger function for insert, update, and delete
@@ -27,7 +27,7 @@ BEGIN
                 TG_TABLE_NAME,
                 NULL,
                 (SELECT row_to_json(t) FROM (
-                    SELECT NEW.* ${exceptClause}
+                    SELECT ${columnsClause} FROM NEW
                 ) t)
             );
         ELSIF (TG_OP = 'UPDATE') THEN
@@ -40,10 +40,10 @@ BEGIN
                 'update',
                 TG_TABLE_NAME,
                 (SELECT row_to_json(t) FROM (
-                    SELECT OLD.* ${exceptClause}
+                    SELECT ${columnsClause} FROM OLD
                 ) t),
                 (SELECT row_to_json(t) FROM (
-                    SELECT NEW.* ${exceptClause}
+                    SELECT ${columnsClause} FROM NEW
                 ) t)
             );
         ELSIF (TG_OP = 'DELETE') THEN
@@ -56,7 +56,7 @@ BEGIN
                 'delete',
                 TG_TABLE_NAME,
                 (SELECT row_to_json(t) FROM (
-                    SELECT OLD.* ${exceptClause}
+                    SELECT ${columnsClause} FROM OLD
                 ) t),
                 NULL
             );
@@ -73,19 +73,30 @@ $$ LANGUAGE plpgsql;`;
   return [functionName, functionBody];
 }
 
-export function extractExcludedColumns(selectStatement: string): Set<string> {
-  const regex = /SELECT OLD\.\*\s*(?:EXCEPT\s*\(([^)]+)\))?/;
-  const match = selectStatement.match(regex);
+export function extractColumnsFromFunction(query: string): Set<string> {
+  // This regex looks for column names in a SELECT clause
+  // It handles various formats including:
+  // - Simple columns: SELECT col1, col2 FROM...
+  // - Parenthesized columns: SELECT (col1, col2, col3) FROM...
+  // - Columns with whitespace: SELECT col1 , col2 FROM...
+  const regex = /SELECT\s+(?:\(([^)]+)\)|([^()]+?)(?=\s+FROM|\s*\)))/i;
 
-  if (!match || !match[1]) {
-    return new Set();
+  const columnSet = new Set<string>();
+  const match = regex.exec(query);
+
+  if (match) {
+    // Get the matched group (either parenthesized or non-parenthesized)
+    const columnsStr = match[1] || match[2];
+
+    if (columnsStr) {
+      // Split by commas and clean up each column name
+      columnsStr
+        .split(",")
+        .map((col) => col.trim())
+        .filter((col) => col && !col.toLowerCase().startsWith("from"))
+        .forEach((col) => columnSet.add(col));
+    }
   }
 
-  // Split on commas, trim whitespace, and filter out empty strings
-  return new Set(
-    match[1]
-      .split(",")
-      .map((col) => col.trim())
-      .filter((col) => col.length > 0)
-  );
+  return columnSet;
 }
