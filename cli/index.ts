@@ -138,21 +138,21 @@ program
 program
   .command("drop")
   .description(
-    "Drop all scheme_for_pg_track_events database objects (triggers, tables, roles)"
+    "Drop all schema_pg_track_events database objects (triggers, tables, roles)"
   )
   .action(async () => {
     console.log(
       kleur.yellow(
-        "\n⚠️  WARNING: This will remove all scheme_for_pg_track_events components from your database"
+        "\n⚠️  WARNING: This will remove all schema_pg_track_events components from your database"
       )
     );
     console.log(
       kleur.dim(
         "\nThis includes:\n" +
-          "- All scheme_for_pg_track_events database triggers\n" +
-          "- The scheme_for_pg_track_events schema\n" +
+          "- All schema_pg_track_events database triggers\n" +
+          "- The schema_pg_track_events schema\n" +
           "- The event_log table\n" +
-          "- The scheme_for_pg_track_events_agent user role\n"
+          "- The schema_pg_track_events_agent user role\n"
       )
     );
     console.log(
@@ -166,7 +166,7 @@ program
       type: "text",
       name: "confirm",
       message:
-        "Type 'confirm' to proceed with dropping all scheme_for_pg_track_events components",
+        "Type 'confirm' to proceed with dropping all schema_pg_track_events components",
     });
 
     if (confirmation.confirm !== "confirm") {

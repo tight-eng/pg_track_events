@@ -3,9 +3,9 @@ import ora from "ora";
 import kleur from "kleur";
 
 export async function createAgentUser(sql: SQL, databaseUrl: string) {
-  console.log("\n" + "Creating scheme_for_pg_track_events_agent role:");
+  console.log("\n" + "Creating schema_pg_track_events_agent role:");
   const spinnerRole = ora(
-    `Creating scheme_for_pg_track_events_agent role`
+    `Creating schema_pg_track_events_agent role`
   ).start();
   try {
     const password = Buffer.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -19,27 +19,27 @@ export async function createAgentUser(sql: SQL, databaseUrl: string) {
           password text := '${password}';
       BEGIN
          -- Create the role if it doesn't already exist, or alter it if it does
-         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scheme_for_pg_track_events_agent') THEN
-            EXECUTE 'CREATE ROLE scheme_for_pg_track_events_agent LOGIN PASSWORD ' || quote_literal(password);
+         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'schema_pg_track_events_agent') THEN
+            EXECUTE 'CREATE ROLE schema_pg_track_events_agent LOGIN PASSWORD ' || quote_literal(password);
          ELSE
-            EXECUTE 'ALTER ROLE scheme_for_pg_track_events_agent WITH PASSWORD ' || quote_literal(password);
+            EXECUTE 'ALTER ROLE schema_pg_track_events_agent WITH PASSWORD ' || quote_literal(password);
          END IF;
          -- Grant permissions to the user
-         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO scheme_for_pg_track_events_agent';
+         EXECUTE 'GRANT CONNECT ON DATABASE ' || current_database() || ' TO schema_pg_track_events_agent';
          -- Public schema permissions
-         GRANT USAGE ON SCHEMA public TO scheme_for_pg_track_events_agent;
-         GRANT SELECT ON ALL TABLES IN SCHEMA public TO scheme_for_pg_track_events_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO scheme_for_pg_track_events_agent;
-         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO scheme_for_pg_track_events_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO scheme_for_pg_track_events_agent;
-         -- scheme_for_pg_track_events schema permissions
-         GRANT USAGE ON SCHEMA scheme_for_pg_track_events TO scheme_for_pg_track_events_agent;
-         GRANT SELECT, INSERT ON scheme_for_pg_track_events.event_log TO scheme_for_pg_track_events_agent;
-         ALTER DEFAULT PRIVILEGES IN SCHEMA scheme_for_pg_track_events GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO scheme_for_pg_track_events_agent;
+         GRANT USAGE ON SCHEMA public TO schema_pg_track_events_agent;
+         GRANT SELECT ON ALL TABLES IN SCHEMA public TO schema_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO schema_pg_track_events_agent;
+         GRANT TRIGGER ON ALL TABLES IN SCHEMA public TO schema_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT TRIGGER ON TABLES TO schema_pg_track_events_agent;
+         -- schema_pg_track_events schema permissions
+         GRANT USAGE ON SCHEMA schema_pg_track_events TO schema_pg_track_events_agent;
+         GRANT SELECT, INSERT ON schema_pg_track_events.event_log TO schema_pg_track_events_agent;
+         ALTER DEFAULT PRIVILEGES IN SCHEMA schema_pg_track_events GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO schema_pg_track_events_agent;
       END $$;
     `);
     spinnerRole.succeed(
-      `Created a limited access scheme_for_pg_track_events_agent role with a random password`
+      `Created a limited access schema_pg_track_events_agent role with a random password`
     );
     console.log(
       "\n" +
@@ -55,7 +55,7 @@ export async function createAgentUser(sql: SQL, databaseUrl: string) {
       ? databaseUrl.split("@")[1]
       : databaseUrl;
     // Construct the connection string with the extracted host
-    const connectionString = `postgresql://scheme_for_pg_track_events_agent:${password}@${databaseHost}`;
+    const connectionString = `postgresql://schema_pg_track_events_agent:${password}@${databaseHost}`;
     console.log(kleur.dim(connectionString) + "\n");
     return;
   } catch (error: any) {
@@ -63,7 +63,7 @@ export async function createAgentUser(sql: SQL, databaseUrl: string) {
       kleur
         .red()
         .bold(
-          `Failed to create scheme_for_pg_track_events_agent role: ${error.message}`
+          `Failed to create schema_pg_track_events_agent role: ${error.message}`
         )
     );
     console.error(kleur.red(error));

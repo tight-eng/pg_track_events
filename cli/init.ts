@@ -11,7 +11,7 @@ import {
 } from "./config/introspection";
 const { MultiSelect, Input } = require("enquirer");
 //constants
-export const schemaName: string = "scheme_for_pg_track_events" as const;
+export const schemaName: string = "schema_pg_track_events" as const;
 
 export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   const sqlBuilder = new SQLBuilder(sql);
@@ -31,14 +31,14 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     await sql`
     SELECT schema_name 
     FROM information_schema.schemata 
-    WHERE schema_name = 'scheme_for_pg_track_events'
+    WHERE schema_name = 'schema_pg_track_events'
   `
   )[0];
 
   if (schemaExists) {
     if (reset) {
       console.log(
-        "Dropping scheme_for_pg_track_events scheme to reset instance..."
+        "Dropping schema_pg_track_events scheme to reset instance..."
       );
       await sql`DROP SCHEMA ${sql(schemaName)} CASCADE`;
     } else {
@@ -151,7 +151,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     const status = await sqlBuilder.commit(true);
 
     if (!status) {
-      console.log(kleur.red("Failed to initialize scheme_for_pg_track_events"));
+      console.log(kleur.red("Failed to initialize schema_pg_track_events"));
       console.log(
         "You may have to manually set up Tight with a migration. Docs here: http://..."
       );
@@ -161,7 +161,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   } else if (output === "o" || output === "out") {
     const fileOutput = new Input({
       name: "output",
-      initial: "scheme_for_pg_track_events_setup.sql",
+      initial: "schema_pg_track_events_setup.sql",
       message: `Which file do you want to output the changes to? ${kleur.dim(
         "\nAppends by default and creates if does not exist."
       )}`,

@@ -1,5 +1,5 @@
 export function tableNameToAuditFunctionName(tableName: string) {
-  return `scheme_for_pg_track_events.log_${tableName}_changes`;
+  return `schema_pg_track_events.log_${tableName}_changes`;
 }
 
 export function logChangesBuilder(
@@ -20,7 +20,7 @@ CREATE OR REPLACE FUNCTION ${functionName}()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -32,7 +32,7 @@ BEGIN
             ${jsonBuildObject("NEW")}
         );
     ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -44,7 +44,7 @@ BEGIN
             ${jsonBuildObject("NEW")}
         );
     ELSIF (TG_OP = 'DELETE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,

@@ -21,11 +21,11 @@ test("can extract single columns from function body", () => {
   expect(columns).toEqual(new Set(["affiliation"]));
 });
 
-const example = `CREATE OR REPLACE FUNCTION scheme_for_pg_track_events.log_alien_types_changes()
+const example = `CREATE OR REPLACE FUNCTION schema_pg_track_events.log_alien_types_changes()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -37,7 +37,7 @@ BEGIN
             json_build_object('affiliation', NEW.affiliation, 'average_lifespan', NEW.average_lifespan, 'force_sensitive', NEW.force_sensitive, 'homeworld', NEW.homeworld, 'id', NEW.id, 'notable_character', NEW.notable_character, 'species_name', NEW.species_name)
         );
     ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -49,7 +49,7 @@ BEGIN
             json_build_object('affiliation', NEW.affiliation, 'average_lifespan', NEW.average_lifespan, 'force_sensitive', NEW.force_sensitive, 'homeworld', NEW.homeworld, 'id', NEW.id, 'notable_character', NEW.notable_character, 'species_name', NEW.species_name)
         );
     ELSIF (TG_OP = 'DELETE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -66,11 +66,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;`;
 
-const exampleOneCol = `CREATE OR REPLACE FUNCTION scheme_for_pg_track_events.log_alien_types_changes()
+const exampleOneCol = `CREATE OR REPLACE FUNCTION schema_pg_track_events.log_alien_types_changes()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -82,7 +82,7 @@ BEGIN
             json_build_object('affiliation', NEW.affiliation)
         );
     ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -94,7 +94,7 @@ BEGIN
             json_build_object('affiliation', NEW.affiliation)
         );
     ELSIF (TG_OP = 'DELETE') THEN
-        INSERT INTO scheme_for_pg_track_events.event_log (
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
