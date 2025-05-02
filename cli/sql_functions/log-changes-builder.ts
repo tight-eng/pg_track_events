@@ -65,28 +65,16 @@ $$ LANGUAGE plpgsql;`;
 }
 
 export function extractColumnsFromFunction(query: string): Set<string> {
-  // This regex looks for column names in a SELECT clause
-  // It handles various formats including:
-  // - Simple columns: SELECT col1, col2 FROM...
-  // - Parenthesized columns: SELECT (col1, col2, col3) FROM...
-  // - Columns with whitespace: SELECT col1 , col2 FROM...
-  const regex = /SELECT\s+(?:\(([^)]+)\)|([^()]+?)(?=\s+FROM|\s*\)))/i;
+  // This regex looks for column names in a json_build_object format
+  // It matches patterns like: 'column_name', NEW.column_name
+  const regex = /'([^']+)',\s*(?:NEW|OLD)\.\1/g;
 
   const columnSet = new Set<string>();
-  const match = regex.exec(query);
+  let match;
 
-  if (match) {
-    // Get the matched group (either parenthesized or non-parenthesized)
-    const columnsStr = match[1] || match[2];
-
-    if (columnsStr) {
-      // Split by commas and clean up each column name
-      columnsStr
-        .split(",")
-        .map((col) => col.trim())
-        .filter((col) => col && !col.toLowerCase().startsWith("from"))
-        .forEach((col) => columnSet.add(col));
-    }
+  while ((match = regex.exec(query)) !== null) {
+    // The first capture group contains the column name
+    columnSet.add(match[1]);
   }
 
   return columnSet;
