@@ -2,33 +2,46 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/typeeng/pg_track_events/agent/internal/config"
 	"github.com/typeeng/pg_track_events/agent/internal/db/queries"
+	"github.com/typeeng/pg_track_events/agent/internal/logger"
 	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 	"github.com/typeeng/pg_track_events/agent/pkg/schemas"
 )
 
-func NewDB(ctx context.Context) (*sql.DB, error) {
+func NewDB(ctx context.Context) (*pgxpool.Pool, error) {
 	cfg := config.ConfigFromContext(ctx)
 
-	db, err := sql.Open("pgx", cfg.DatabaseURL)
+	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse connection string: %w", err)
 	}
 
-	return db, nil
+	if cfg.PgxPreferSimpleProtocol {
+		logger.Logger().Info("using pgx simple protocol mode")
+		poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create connection pool: %w", err)
+	}
+
+	return pool, nil
 }
 
 // FetchDBEvents retrieves a batch of events from the event_log table
 // using SELECT FOR UPDATE SKIP LOCKED to implement a queue pattern.
-// It returns the events and the active transaction which must be committed
+// It returns the events and the pgx transaction which must be committed
 // or rolled back by the caller.
-func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sql.Tx, error) {
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEvent, pgx.Tx, error) {
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -46,9 +59,9 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sq
 		LIMIT $1
 	`, tableName)
 
-	rows, err := tx.QueryContext(ctx, query, cfg.BatchSize)
+	rows, err := tx.Query(ctx, query, cfg.BatchSize)
 	if err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		return nil, nil, fmt.Errorf("failed to query events: %w", err)
 	}
 	defer rows.Close()
@@ -57,7 +70,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sq
 	for rows.Next() {
 		var event eventmodels.DBEvent
 		var eventTypeStr string
-		var oldRow, newRow sql.NullString
+		var oldRow, newRow pgtype.Text
 
 		if err := rows.Scan(
 			&event.ID,
@@ -67,7 +80,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sq
 			&oldRow,
 			&newRow,
 		); err != nil {
-			tx.Rollback()
+			tx.Rollback(ctx)
 			return nil, nil, fmt.Errorf("failed to scan event: %w", err)
 		}
 
@@ -85,7 +98,7 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sq
 	}
 
 	if err := rows.Err(); err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		return nil, nil, fmt.Errorf("error iterating event rows: %w", err)
 	}
 
@@ -94,13 +107,13 @@ func FetchDBEvents(ctx context.Context, db *sql.DB) ([]*eventmodels.DBEvent, *sq
 
 // FlushDBEvents removes processed events from the event_log table
 // using the transaction obtained from FetchEvents
-func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
+func FlushDBEvents(ctx context.Context, tx pgx.Tx, eventIDs []int64) error {
 	if len(eventIDs) == 0 {
-		return tx.Commit()
+		return tx.Commit(ctx)
 	}
 
 	// TODO Do we need this just in case?
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	cfg := config.ConfigFromContext(ctx)
 
@@ -108,13 +121,13 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE id = ANY($1)", tableName)
-	_, err := tx.ExecContext(ctx, query, eventIDs)
+	_, err := tx.Exec(ctx, query, eventIDs)
 	if err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		return fmt.Errorf("failed to delete events: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -122,9 +135,9 @@ func FlushDBEvents(ctx context.Context, tx *sql.Tx, eventIDs []int64) error {
 }
 
 // GetSchema retrieves the database schema using the provided SQL query
-func GetSchema(ctx context.Context, db *sql.DB) (schemas.PostgresqlTableSchemaList, error) {
+func GetSchema(ctx context.Context, pool *pgxpool.Pool) (schemas.PostgresqlTableSchemaList, error) {
 	// Execute the query using the embedded SQL content
-	rows, err := db.QueryContext(ctx, queries.IntrospectSQL)
+	rows, err := pool.Query(ctx, queries.IntrospectSQL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute schema query: %w", err)
 	}

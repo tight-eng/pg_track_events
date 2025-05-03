@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/typeeng/pg_track_events/agent/internal/config"
 	"github.com/typeeng/pg_track_events/agent/internal/db"
 	"github.com/typeeng/pg_track_events/agent/internal/logger"
@@ -38,14 +37,14 @@ func main() {
 	logger.Logger().Info("loaded config", "track", len(cfg.EventStreamingConfig.Track), "destinations", len(cfg.EventStreamingConfig.Destinations), "ignore", len(cfg.EventStreamingConfig.Ignore))
 
 	// Connect to database
-	dbConn, err := db.NewDB(ctx)
+	dbPool, err := db.NewDB(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer dbConn.Close()
+	defer dbPool.Close()
 
 	// Configure and start the agent
-	eventAgent, err := agent.NewAgent(ctx, dbConn)
+	eventAgent, err := agent.NewAgent(ctx, dbPool)
 	if err != nil {
 		log.Fatalf("Failed to initialize agent: %v", err)
 	}

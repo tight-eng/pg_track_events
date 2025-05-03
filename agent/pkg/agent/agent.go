@@ -2,12 +2,12 @@ package agent
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"path/filepath"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/typeeng/pg_track_events/agent/internal/config"
 	"github.com/typeeng/pg_track_events/agent/internal/db"
 	"github.com/typeeng/pg_track_events/agent/internal/evtxfrm"
@@ -19,7 +19,7 @@ import (
 )
 
 type Agent struct {
-	db                         *sql.DB
+	db                         *pgxpool.Pool
 	cfg                        *config.AgentConfig
 	logger                     *slog.Logger
 	schema                     schemas.PostgresqlTableSchemaList
@@ -44,7 +44,7 @@ func WithE2EDBEventChan(ch chan<- *eventmodels.DBEvent) AgentOption {
 	}
 }
 
-func NewAgent(ctx context.Context, db *sql.DB, opts ...AgentOption) (*Agent, error) {
+func NewAgent(ctx context.Context, db *pgxpool.Pool, opts ...AgentOption) (*Agent, error) {
 	cfg := config.ConfigFromContext(ctx)
 	logger := logger.Logger()
 
@@ -151,7 +151,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 		a.logger.Info("no events to process")
 		// No events to process, commit or rollback the empty transaction
 		if tx != nil {
-			tx.Rollback()
+			tx.Rollback(ctx)
 		}
 		return false, nil
 	}
@@ -168,7 +168,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 		if err != nil {
 			a.logger.Error("failed to process event", "error", err)
 			// TODO Think about how to handle retries, etc.
-			tx.Rollback()
+			tx.Rollback(ctx)
 			return false, err
 		}
 
@@ -185,7 +185,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 	if len(processedEvents) > 0 {
 		a.logger.Info("sending processed events to destinations", "count", len(processedEvents))
 		if err := a.sendProcessedEvents(ctx, processedEvents); err != nil {
-			tx.Rollback()
+			tx.Rollback(ctx)
 			a.logger.Error("failed to send processed events to destinations", "error", err)
 			return false, err
 		}
@@ -196,7 +196,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 
 	a.logger.Info("sending db events to destinations", "count", len(dbEvents))
 	if err := a.sendDBEvents(ctx, dbEvents); err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		a.logger.Error("failed to send db events to destinations", "error", err)
 		return false, err
 	}
@@ -205,7 +205,7 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 	// Flush all processed events, including excluded ones
 	a.logger.Info("flushing processed events", "count", len(eventIds))
 	if err := db.FlushDBEvents(ctx, tx, eventIds); err != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		a.logger.Error("failed to delete processed events", "error", err)
 		return false, err
 	}

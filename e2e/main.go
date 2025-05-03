@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/typeeng/pg_track_events/agent/pkg/agent"
@@ -150,13 +148,8 @@ func runScenario(ctx context.Context, pool *pgxpool.Pool, scenario Scenario) err
 	processedEventChan := make(chan *eventmodels.ProcessedEvent, 10_000)
 	go func() {
 		defer close(agentDone)
-		agentDbConn, err := sql.Open("pgx", dbURL)
-		if err != nil {
-			log.Fatalf("initialize agent: %v", err)
-		}
-		defer agentDbConn.Close()
 
-		eventAgent, err := agent.NewAgent(ctx, agentDbConn, agent.WithE2EDBEventChan(dbEventChan), agent.WithE2EProcessedEventChan(processedEventChan))
+		eventAgent, err := agent.NewAgent(ctx, pool, agent.WithE2EDBEventChan(dbEventChan), agent.WithE2EProcessedEventChan(processedEventChan))
 		if err != nil {
 			log.Fatalf("initialize agent: %v", err)
 		}

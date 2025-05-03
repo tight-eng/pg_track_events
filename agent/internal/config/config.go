@@ -3,38 +3,46 @@ package config
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/typeeng/pg_track_events/agent/internal/env"
 )
 
 const (
-	databaseURLEnvKey         = "DATABASE_URL"
-	analyticsConfigPathEnvKey = "EVENTS_CONFIG_PATH"
+	databaseURLEnvKey = "DATABASE_URL"
 
-	batchSizeEnvKey      = "BATCH_SIZE"
+	pgxPreferSimpleProtocolEnvKey  = "PGX_PREFER_SIMPLE_PROTOCOL"
+	defaultPgxPreferSimpleProtocol = false
+
+	batchSizeEnvKey  = "BATCH_SIZE"
+	defaultBatchSize = 1000
+
 	fetchIntervalEnvKey  = "FETCH_INTERVAL"
-	defaultBatchSize     = 100
 	defaultFetchInterval = 5 * time.Second
 
 	defaultSchemaNameEnvKey = "DEFAULT_SCHEMA_NAME"
 	defaultSchemaName       = "public"
 
-	internalSchemaNameEnvKey        = "INTERNAL_SCHEMA_NAME"
-	eventLogTableNameEnvKey         = "EVENT_LOG_TABLE_NAME"
-	defaultInternalSchemaName       = "schema_pg_track_events"
-	defaultEventLogTableName        = "event_log"
+	internalSchemaNameEnvKey  = "INTERNAL_SCHEMA_NAME"
+	defaultInternalSchemaName = "schema_pg_track_events"
+
+	eventLogTableNameEnvKey  = "EVENT_LOG_TABLE_NAME"
+	defaultEventLogTableName = "event_log"
+
+	analyticsConfigPathEnvKey       = "EVENTS_CONFIG_PATH"
 	defaultEventStreamingConfigPath = "pg_track_events.config.yaml"
 )
 
 type AgentConfig struct {
-	DatabaseURL          string
-	BatchSize            int
-	FetchInterval        time.Duration
-	DefaultSchemaName    string
-	InternalSchemaName   string
-	EventLogTableName    string
-	EventStreamingConfig *EventStreamingConfig
+	DatabaseURL             string
+	BatchSize               int
+	FetchInterval           time.Duration
+	DefaultSchemaName       string
+	InternalSchemaName      string
+	EventLogTableName       string
+	PgxPreferSimpleProtocol bool
+	EventStreamingConfig    *EventStreamingConfig
 }
 
 var config *AgentConfig
@@ -66,18 +74,21 @@ func getDefaultConfig() *AgentConfig {
 	var err error
 
 	cfg := &AgentConfig{
-		BatchSize:            defaultBatchSize,
-		FetchInterval:        defaultFetchInterval,
-		DefaultSchemaName:    defaultSchemaName,
-		InternalSchemaName:   defaultInternalSchemaName,
-		EventLogTableName:    defaultEventLogTableName,
-		EventStreamingConfig: &EventStreamingConfig{},
+		BatchSize:               defaultBatchSize,
+		FetchInterval:           defaultFetchInterval,
+		DefaultSchemaName:       defaultSchemaName,
+		InternalSchemaName:      defaultInternalSchemaName,
+		EventLogTableName:       defaultEventLogTableName,
+		PgxPreferSimpleProtocol: defaultPgxPreferSimpleProtocol,
+		EventStreamingConfig:    &EventStreamingConfig{},
 	}
 
 	cfg.DatabaseURL = env.FirstOrDefault(cfg.DatabaseURL, databaseURLEnvKey)
 	if cfg.DatabaseURL == "" {
 		panic("DATABASE_URL is not set")
 	}
+
+	cfg.PgxPreferSimpleProtocol = strings.TrimSpace(env.FirstOrDefault(strconv.FormatBool(cfg.PgxPreferSimpleProtocol), pgxPreferSimpleProtocolEnvKey)) == "true"
 
 	// Parse BatchSize from environment
 	if batchSizeStr := env.First(batchSizeEnvKey); batchSizeStr != "" {
