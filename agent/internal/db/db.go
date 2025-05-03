@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -52,14 +53,15 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf(`
-		SELECT id, event_type, row_table_name, logged_at, old_row, new_row
+		SELECT id, event_type, row_table_name, logged_at, retries, last_error, last_retry_at, next_retry_at, old_row, new_row
 		FROM %s
+		WHERE (next_retry_at IS NULL OR next_retry_at < $1)
 		ORDER BY id ASC
 		FOR UPDATE SKIP LOCKED
-		LIMIT $1
+		LIMIT $2
 	`, tableName)
 
-	rows, err := tx.Query(ctx, query, cfg.BatchSize)
+	rows, err := tx.Query(ctx, query, time.Now(), cfg.BatchSize)
 	if err != nil {
 		tx.Rollback(ctx)
 		return nil, nil, fmt.Errorf("failed to query events: %w", err)
@@ -77,6 +79,10 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 			&eventTypeStr,
 			&event.RowTableName,
 			&event.LoggedAt,
+			&event.Retries,
+			&event.LastError,
+			&event.LastRetryAt,
+			&event.NextRetryAt,
 			&oldRow,
 			&newRow,
 		); err != nil {
@@ -103,6 +109,45 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 	}
 
 	return events, tx, nil
+}
+
+func UpdateDBEvents(ctx context.Context, tx pgx.Tx, updates []*eventmodels.DBEventUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	cfg := config.ConfigFromContext(ctx)
+
+	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
+
+	// Prepare batch for multiple updates
+	batch := &pgx.Batch{}
+
+	// Create query for each update
+	baseQuery := fmt.Sprintf(`
+		UPDATE %s
+		SET retries = $1, last_error = $2, last_retry_at = $3, next_retry_at = $4
+		WHERE id = $5
+	`, tableName)
+
+	// Add each update to the batch
+	for _, update := range updates {
+		batch.Queue(baseQuery, update.Retries, update.LastError, update.LastRetryAt, update.NextRetryAt, update.ID)
+	}
+
+	// Execute all updates as a batch
+	results := tx.SendBatch(ctx, batch)
+	defer results.Close()
+
+	// Check for errors
+	for i := 0; i < len(updates); i++ {
+		_, err := results.Exec()
+		if err != nil {
+			return fmt.Errorf("failed to update event (index %d): %w", i, err)
+		}
+	}
+
+	return nil
 }
 
 // FlushDBEvents removes processed events from the event_log table

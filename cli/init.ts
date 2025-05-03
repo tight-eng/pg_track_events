@@ -74,6 +74,10 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     event_type ${schemaName}.event_type NOT NULL,
     row_table_name TEXT NOT NULL,
     logged_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    retries INT NOT NULL DEFAULT 0,
+    last_error TEXT,
+    last_retry_at TIMESTAMPTZ,
+    next_retry_at TIMESTAMPTZ,
     old_row JSONB,
     new_row JSONB,
     CONSTRAINT event_type_update_check CHECK (

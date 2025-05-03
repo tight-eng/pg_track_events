@@ -34,6 +34,18 @@ type DBEvent struct {
 	EventType    DBEventType     `json:"event_type"`
 	RowTableName string          `json:"row_table_name"`
 	LoggedAt     time.Time       `json:"logged_at"`
+	Retries      int             `json:"retries"`
+	LastError    *string         `json:"last_error,omitempty"`
+	LastRetryAt  *time.Time      `json:"last_retry_at,omitempty"`
+	NextRetryAt  *time.Time      `json:"next_retry_at,omitempty"`
 	OldRow       json.RawMessage `json:"old_row,omitempty"`
 	NewRow       json.RawMessage `json:"new_row,omitempty"`
+}
+
+type DBEventUpdate struct {
+	ID          int64
+	Retries     int
+	LastError   *string
+	LastRetryAt *time.Time
+	NextRetryAt *time.Time
 }
