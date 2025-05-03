@@ -8,6 +8,7 @@ import { logChangesBuilder } from "./sql_functions/log-changes-builder";
 import {
   getColumnsForTable,
   getIntrospectedSchema,
+  getTableNames,
 } from "./config/introspection";
 const { MultiSelect, Input } = require("enquirer");
 //constants
@@ -17,14 +18,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
   const sqlBuilder = new SQLBuilder(sql);
 
   const introspectedSchema = await getIntrospectedSchema(sql);
-
-  // Get all tables in the public schema
-  const tableQuery =
-    await sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`;
-
-  const tables: string[] = tableQuery
-    .map((row: { table_name: string }) => row.table_name)
-    .sort();
+  const tables: string[] = getTableNames(introspectedSchema).sort();
 
   // Check if schema exists
   const schemaExists = !!(
