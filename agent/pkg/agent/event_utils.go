@@ -14,19 +14,19 @@ func GenerateEventErrorUpdate(eventID int64, currentRetries int, err error) *eve
 
 	// Calculate next retry time with exponential backoff
 	// Base delay is 1 minute, doubled for each retry up to a reasonable maximum
-	var nextRetry time.Time
+	var processAfter time.Time
 	delayMinutes := 1 << uint(currentRetries) // 2^retries minutes (1, 2, 4, 8, 16...)
 	if delayMinutes > 60 {
 		delayMinutes = 60 // Cap at 60 minutes
 	}
-	nextRetry = now.Add(time.Duration(delayMinutes) * time.Minute)
+	processAfter = now.Add(time.Duration(delayMinutes) * time.Minute)
 
 	return &eventmodels.DBEventUpdate{
-		ID:          eventID,
-		Retries:     currentRetries + 1,
-		LastError:   &errStr,
-		LastRetryAt: &now,
-		NextRetryAt: &nextRetry,
+		ID:           eventID,
+		Retries:      currentRetries + 1,
+		LastError:    &errStr,
+		LastRetryAt:  &now,
+		ProcessAfter: &processAfter,
 	}
 }
 
@@ -73,10 +73,10 @@ func MergeEventErrorUpdates(updates []*eventmodels.DBEventUpdate) []*eventmodels
 			}
 
 			// Use the earliest next retry time
-			if update.NextRetryAt != nil &&
-				(existingUpdate.NextRetryAt == nil ||
-					update.NextRetryAt.Before(*existingUpdate.NextRetryAt)) {
-				existingUpdate.NextRetryAt = update.NextRetryAt
+			if update.ProcessAfter != nil &&
+				(existingUpdate.ProcessAfter == nil ||
+					update.ProcessAfter.Before(*existingUpdate.ProcessAfter)) {
+				existingUpdate.ProcessAfter = update.ProcessAfter
 			}
 
 			// Keep the latest retry attempt time

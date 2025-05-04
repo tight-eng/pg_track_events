@@ -77,7 +77,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     retries INT NOT NULL DEFAULT 0,
     last_error TEXT,
     last_retry_at TIMESTAMPTZ,
-    next_retry_at TIMESTAMPTZ,
+    process_after TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     old_row JSONB,
     new_row JSONB,
     CONSTRAINT event_type_update_check CHECK (
@@ -96,6 +96,12 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     `${kleur.dim("+")} ${kleur.bold("event_log")} ${kleur.dim(
       "table in"
     )} ${kleur.bold(schemaName)} ${kleur.dim("schema")}`
+  );
+
+  sqlBuilder.add(
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS event_log_process_after_idx
+    ON ${schemaName}.event_log (process_after)`,
+    `${kleur.dim("+")} ${kleur.bold("event_log_process_after_idx")} ${kleur.dim("index")}`
   );
 
   // Add triggers for each table with progress indicator

@@ -37,15 +37,15 @@ type DBEvent struct {
 	Retries      int             `json:"retries"`
 	LastError    *string         `json:"last_error,omitempty"`
 	LastRetryAt  *time.Time      `json:"last_retry_at,omitempty"`
-	NextRetryAt  *time.Time      `json:"next_retry_at,omitempty"`
+	ProcessAfter *time.Time      `json:"process_after,omitempty"`
 	OldRow       json.RawMessage `json:"old_row,omitempty"`
 	NewRow       json.RawMessage `json:"new_row,omitempty"`
 }
 
 type DBEventUpdate struct {
-	ID          int64
-	Retries     int
-	LastError   *string
-	LastRetryAt *time.Time
-	NextRetryAt *time.Time
+	ID           int64
+	Retries      int
+	LastError    *string
+	LastRetryAt  *time.Time
+	ProcessAfter *time.Time
 }

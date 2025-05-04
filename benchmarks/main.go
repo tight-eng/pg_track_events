@@ -229,16 +229,35 @@ FOR EACH ROW EXECUTE FUNCTION bench.audit_items();`
 
 func createAuditLogTable(ctx context.Context, pool *pgxpool.Pool) {
 	ddl := `
-CREATE SCHEMA IF NOT EXISTS tight_analytics;
-DROP TABLE IF EXISTS tight_analytics.event_log;
-CREATE TABLE tight_analytics.event_log (
-    id SERIAL PRIMARY KEY,
-    event_type TEXT NOT NULL,
+CREATE SCHEMA IF NOT EXISTS schema_pg_track_events;
+DROP TABLE IF EXISTS schema_pg_track_events.event_log;
+CREATE TYPE schema_pg_track_events.event_type AS ENUM ('insert', 'update', 'delete');
+CREATE TABLE schema_pg_track_events.event_log (
+    id BIGSERIAL PRIMARY KEY,
+    event_type schema_pg_track_events.event_type NOT NULL,
     row_table_name TEXT NOT NULL,
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    retries INT NOT NULL DEFAULT 0,
+    last_error TEXT,
+    last_retry_at TIMESTAMPTZ,
+    process_after TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     old_row JSONB,
     new_row JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);`
+    CONSTRAINT event_type_update_check CHECK (
+      (event_type = 'update' AND old_row IS NOT NULL AND new_row IS NOT NULL) OR
+      (event_type != 'update')
+    ),
+    CONSTRAINT event_type_insert_check CHECK (
+      (event_type = 'insert' AND old_row IS NULL AND new_row IS NOT NULL) OR 
+      (event_type != 'insert')
+    ),
+    CONSTRAINT event_type_delete_check CHECK (
+      (event_type = 'delete' AND old_row IS NOT NULL AND new_row IS NULL) OR
+      (event_type != 'delete')
+    )
+  );
+CREATE INDEX IF NOT EXISTS event_log_process_after_idx
+    ON schema_pg_track_events.event_log (process_after);`
 	if _, err := pool.Exec(ctx, ddl); err != nil {
 		log.Fatalf("create audit log table: %v", err)
 	}
@@ -251,7 +270,13 @@ RETURNS trigger LANGUAGE plpgsql AS
 $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        INSERT INTO tight_analytics.event_log (
+		BEGIN
+			NEW.status_not_exists := NULL;
+		EXCEPTION
+			WHEN undefined_column THEN
+				NULL;
+		END;
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -263,7 +288,19 @@ BEGIN
             to_jsonb(NEW)
         );
     ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO tight_analytics.event_log (
+		BEGIN
+			NEW.status_not_exists := NULL;
+		EXCEPTION
+			WHEN undefined_column THEN
+				NULL;
+		END;
+		BEGIN
+			OLD.status_not_exists := NULL;
+		EXCEPTION
+			WHEN undefined_column THEN
+				NULL;
+		END;
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -275,7 +312,13 @@ BEGIN
             to_jsonb(NEW)
         );
     ELSIF (TG_OP = 'DELETE') THEN
-        INSERT INTO tight_analytics.event_log (
+		BEGIN
+			OLD.status_not_exists := NULL;
+		EXCEPTION
+			WHEN undefined_column THEN
+				NULL;
+		END;
+        INSERT INTO schema_pg_track_events.event_log (
             event_type,
             row_table_name,
             old_row,
@@ -287,7 +330,7 @@ BEGIN
             NULL
         );
     END IF;
-    
+
     RETURN NULL;
 END;
 $$;
@@ -300,6 +343,225 @@ FOR EACH ROW EXECUTE FUNCTION bench.audit_items();`
 		log.Fatalf("create audit log trigger: %v", err)
 	}
 }
+
+// func createAuditLogTrigger(ctx context.Context, pool *pgxpool.Pool) {
+// 	ddl := `
+// CREATE OR REPLACE FUNCTION bench.audit_items()
+// RETURNS trigger LANGUAGE plpgsql AS
+// $$
+// BEGIN
+//     IF (TG_OP = 'INSERT') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'insert',
+//             TG_TABLE_NAME,
+//             NULL,
+//             to_jsonb(NEW) - 'status'
+//         );
+//     ELSIF (TG_OP = 'UPDATE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'update',
+//             TG_TABLE_NAME,
+//             to_jsonb(OLD) - 'status',
+//             to_jsonb(NEW) - 'status'
+//         );
+//     ELSIF (TG_OP = 'DELETE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'delete',
+//             TG_TABLE_NAME,
+//             to_jsonb(OLD) - 'status',
+//             NULL
+//         );
+//     END IF;
+
+//     RETURN NULL;
+// END;
+// $$;
+
+// DROP TRIGGER IF EXISTS items_audit_trigger ON bench.items;
+// CREATE TRIGGER items_audit_trigger
+// AFTER INSERT OR UPDATE OR DELETE ON bench.items
+// FOR EACH ROW EXECUTE FUNCTION bench.audit_items();`
+// 	if _, err := pool.Exec(ctx, ddl); err != nil {
+// 		log.Fatalf("create audit log trigger: %v", err)
+// 	}
+// }
+
+// func createAuditLogTrigger(ctx context.Context, pool *pgxpool.Pool) {
+// 	ddl := `
+// CREATE OR REPLACE FUNCTION bench.audit_items()
+// RETURNS trigger LANGUAGE plpgsql AS
+// $$
+// BEGIN
+//     IF (TG_OP = 'INSERT') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'insert',
+//             TG_TABLE_NAME,
+//             NULL,
+//             to_jsonb(NEW) - '{status}'::text[]
+//         );
+//     ELSIF (TG_OP = 'UPDATE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'update',
+//             TG_TABLE_NAME,
+//             to_jsonb(OLD) - '{status}'::text[],
+//             to_jsonb(NEW) - '{status}'::text[]
+//         );
+//     ELSIF (TG_OP = 'DELETE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'delete',
+//             TG_TABLE_NAME,
+//             to_jsonb(OLD) - '{status}'::text[],
+//             NULL
+//         );
+//     END IF;
+
+//     RETURN NULL;
+// END;
+// $$;
+
+// DROP TRIGGER IF EXISTS items_audit_trigger ON bench.items;
+// CREATE TRIGGER items_audit_trigger
+// AFTER INSERT OR UPDATE OR DELETE ON bench.items
+// FOR EACH ROW EXECUTE FUNCTION bench.audit_items();`
+// 	if _, err := pool.Exec(ctx, ddl); err != nil {
+// 		log.Fatalf("create audit log trigger: %v", err)
+// 	}
+// }
+
+// func createAuditLogTrigger(ctx context.Context, pool *pgxpool.Pool) {
+// 	ddl := `
+// CREATE OR REPLACE FUNCTION bench.audit_items()
+// RETURNS trigger LANGUAGE plpgsql AS
+// $$
+// BEGIN
+//     IF (TG_OP = 'INSERT') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'insert',
+//             TG_TABLE_NAME,
+//             NULL,
+//             json_build_object(
+//                 'id', NEW.id,
+//                 'title', NEW.title,
+//                 'description', NEW.description,
+//                 'status', NEW.status,
+//                 'priority', NEW.priority,
+//                 'department', NEW.department,
+//                 'amount', NEW.amount,
+//                 'created_at', NEW.created_at,
+//                 'updated_at', NEW.updated_at,
+//                 'metadata', NEW.metadata,
+//                 'attributes', NEW.attributes
+//             )
+//         );
+//     ELSIF (TG_OP = 'UPDATE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'update',
+//             TG_TABLE_NAME,
+//             json_build_object(
+//                 'id', OLD.id,
+//                 'title', OLD.title,
+//                 'description', OLD.description,
+//                 'status', OLD.status,
+//                 'priority', OLD.priority,
+//                 'department', OLD.department,
+//                 'amount', OLD.amount,
+//                 'created_at', OLD.created_at,
+//                 'updated_at', OLD.updated_at,
+//                 'metadata', OLD.metadata,
+//                 'attributes', OLD.attributes
+//             ),
+//             json_build_object(
+//                 'id', NEW.id,
+//                 'title', NEW.title,
+//                 'description', NEW.description,
+//                 'status', NEW.status,
+//                 'priority', NEW.priority,
+//                 'department', NEW.department,
+//                 'amount', NEW.amount,
+//                 'created_at', NEW.created_at,
+//                 'updated_at', NEW.updated_at,
+//                 'metadata', NEW.metadata,
+//                 'attributes', NEW.attributes
+//             )
+//         );
+//     ELSIF (TG_OP = 'DELETE') THEN
+//         INSERT INTO schema_pg_track_events.event_log (
+//             event_type,
+//             row_table_name,
+//             old_row,
+//             new_row
+//         ) VALUES (
+//             'delete',
+//             TG_TABLE_NAME,
+//             json_build_object(
+//                 'id', OLD.id,
+//                 'title', OLD.title,
+//                 'description', OLD.description,
+//                 'status', OLD.status,
+//                 'priority', OLD.priority,
+//                 'department', OLD.department,
+//                 'amount', OLD.amount,
+//                 'created_at', OLD.created_at,
+//                 'updated_at', OLD.updated_at,
+//                 'metadata', OLD.metadata,
+//                 'attributes', OLD.attributes
+//             ),
+//             NULL
+//         );
+//     END IF;
+
+//     RETURN NULL;
+// END;
+// $$;
+
+// DROP TRIGGER IF EXISTS items_audit_trigger ON bench.items;
+// CREATE TRIGGER items_audit_trigger
+// AFTER INSERT OR UPDATE OR DELETE ON bench.items
+// FOR EACH ROW EXECUTE FUNCTION bench.audit_items();`
+// 	if _, err := pool.Exec(ctx, ddl); err != nil {
+// 		log.Fatalf("create audit log trigger: %v", err)
+// 	}
+// }
 
 // -------------------------------------------------------------------------
 // Utility helpers
