@@ -19,20 +19,20 @@ func NewTestDestination[T any](eventsChan chan<- T) *TestDestination[T] {
 }
 
 // SendBatch sends a batch of events to the test channel
-func (t *TestDestination[T]) SendBatch(ctx context.Context, events []T) error {
+func (t *TestDestination[T]) SendBatch(ctx context.Context, events []T) ([]*DestinationEventError, error) {
 	if len(events) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	for _, event := range events {
 		select {
 		case t.eventsChan <- event:
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // NewTestProcessedEventDestination creates a new test destination for processed events

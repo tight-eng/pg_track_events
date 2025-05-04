@@ -57,9 +57,9 @@ type amplitudeRequest struct {
 }
 
 // SendBatch sends a batch of processed events to Amplitude
-func (a *AmplitudeDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) error {
+func (a *AmplitudeDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) ([]*DestinationEventError, error) {
 	if len(processedEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	a.logger.Info("sending events to Amplitude", "count", len(processedEvents))
@@ -84,13 +84,13 @@ func (a *AmplitudeDestination) SendBatch(ctx context.Context, processedEvents []
 	// Marshal request body
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		return fmt.Errorf("failed to marshal Amplitude request: %w", err)
+		return nil, fmt.Errorf("failed to marshal Amplitude request: %w", err)
 	}
 
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/batch", a.endpoint), bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to create Amplitude request: %w", err)
+		return nil, fmt.Errorf("failed to create Amplitude request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "*/*")
@@ -98,15 +98,15 @@ func (a *AmplitudeDestination) SendBatch(ctx context.Context, processedEvents []
 	// Send request
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send events to Amplitude: %w", err)
+		return nil, fmt.Errorf("failed to send events to Amplitude: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("amplitude API returned non-200 status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("amplitude API returned non-200 status code: %d", resp.StatusCode)
 	}
 
 	a.logger.Info("successfully sent events to Amplitude", "count", len(processedEvents))
-	return nil
+	return nil, nil
 }

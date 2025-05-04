@@ -151,14 +151,11 @@ func UpdateDBEvents(ctx context.Context, tx pgx.Tx, updates []*eventmodels.DBEve
 }
 
 // FlushDBEvents removes processed events from the event_log table
-// using the transaction obtained from FetchEvents
+// using the transaction obtained from FetchDBEvents
 func FlushDBEvents(ctx context.Context, tx pgx.Tx, eventIDs []int64) error {
 	if len(eventIDs) == 0 {
 		return tx.Commit(ctx)
 	}
-
-	// TODO Do we need this just in case?
-	defer tx.Rollback(ctx)
 
 	cfg := config.ConfigFromContext(ctx)
 
@@ -170,10 +167,6 @@ func FlushDBEvents(ctx context.Context, tx pgx.Tx, eventIDs []int64) error {
 	if err != nil {
 		tx.Rollback(ctx)
 		return fmt.Errorf("failed to delete events: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

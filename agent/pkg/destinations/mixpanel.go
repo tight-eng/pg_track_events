@@ -34,9 +34,9 @@ func NewMixpanelDestination(projectToken string, logger *slog.Logger) (*Mixpanel
 }
 
 // SendBatch sends a batch of processed events to Mixpanel
-func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) error {
+func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) ([]*DestinationEventError, error) {
 	if len(processedEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Convert processed events to Mixpanel events
@@ -65,10 +65,10 @@ func (m *MixpanelDestination) SendBatch(ctx context.Context, processedEvents []*
 	})
 	if err != nil {
 		m.logger.Error("failed to send events to Mixpanel", "error", err)
-		return fmt.Errorf("failed to send events to Mixpanel: %w", err)
+		return nil, fmt.Errorf("failed to send events to Mixpanel: %w", err)
 	}
 	m.logger.Info("mixpanel import status", "status", importStatus)
 
 	m.logger.Info("successfully sent events to Mixpanel", "count", len(mixpanelEvents))
-	return nil
+	return nil, nil
 }

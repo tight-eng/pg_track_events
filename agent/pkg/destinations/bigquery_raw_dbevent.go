@@ -65,9 +65,9 @@ type bigqueryRawDBEvent struct {
 }
 
 // SendBatch sends a batch of DB events to BigQuery
-func (b *BigQueryRawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eventmodels.DBEvent) error {
+func (b *BigQueryRawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eventmodels.DBEvent) ([]*DestinationEventError, error) {
 	if len(dbEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	b.logger.Info("sending raw DB events to BigQuery", "count", len(dbEvents))
@@ -106,9 +106,9 @@ func (b *BigQueryRawDBEventDestination) SendBatch(ctx context.Context, dbEvents 
 	// Insert the events
 	if err := inserter.Put(ctx, bigqueryRawEvents); err != nil {
 		b.logger.Error("failed to insert raw DB events to BigQuery", "error", err)
-		return fmt.Errorf("failed to insert raw DB events to BigQuery: %w", err)
+		return nil, fmt.Errorf("failed to insert raw DB events to BigQuery: %w", err)
 	}
 
 	b.logger.Info("successfully sent raw DB events to BigQuery", "count", len(dbEvents))
-	return nil
+	return nil, nil
 }

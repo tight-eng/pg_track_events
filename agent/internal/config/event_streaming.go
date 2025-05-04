@@ -139,8 +139,8 @@ func (dc *DestinationConfig) Validate(destKey string) error {
 		if dc.Region, err = env.ValueOrRequiredEnvVar(dc.Region); err != nil {
 			return fmt.Errorf("region is required for S3 destination: %w", err)
 		}
-		if dc.RootDir, err = env.ValueOrRequiredEnvVar(dc.RootDir); err != nil {
-			return fmt.Errorf("root directory is required for S3 destination: %w", err)
+		if dc.RootDir != "" {
+			dc.RootDir, _ = env.ValueOrRequiredEnvVar(dc.RootDir)
 		}
 		if dc.AccessKey, err = env.ValueOrRequiredEnvVar(dc.AccessKey); err != nil {
 			return fmt.Errorf("access key is required for S3 destination: %w", err)

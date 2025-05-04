@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/typeeng/pg_track_events/agent/internal/config"
 	"github.com/typeeng/pg_track_events/agent/internal/db"
 	"github.com/typeeng/pg_track_events/agent/internal/evtxfrm"
 	"github.com/typeeng/pg_track_events/agent/internal/logger"
+	"github.com/typeeng/pg_track_events/agent/pkg/destinations"
 	"github.com/typeeng/pg_track_events/agent/pkg/eventmodels"
 	"github.com/typeeng/pg_track_events/agent/pkg/schemas"
 	"google.golang.org/protobuf/proto"
@@ -160,62 +162,165 @@ func (a *Agent) processEventBatch(ctx context.Context) (bool, error) {
 
 	// Track events to send to API and events to flush from DB
 	eventIds := make([]int64, len(dbEvents))
+	eventRetriesMap := make(map[int64]int)
 	var processedEvents []*eventmodels.ProcessedEvent
+	var failedEventUpdates []*eventmodels.DBEventUpdate
+
+	// Build ID list and retries map for error handling
 	for i, dbEvent := range dbEvents {
 		eventIds[i] = dbEvent.ID
+		eventRetriesMap[dbEvent.ID] = dbEvent.Retries
+	}
+
+	// Process events into transformed events
+	for _, dbEvent := range dbEvents {
 		// Process event with protobuf support
 		processedEvent, err := evtxfrm.ProcessEvent(dbEvent, a.cfg.EventStreamingConfig, a.schemaPbPkgName, a.schemaPbDescriptor)
 		if err != nil {
-			a.logger.Error("failed to process event", "error", err)
-			// TODO Think about how to handle retries, etc.
-			tx.Rollback(ctx)
-			return false, err
+			a.logger.Error("failed to process event", "error", err, "event_id", dbEvent.ID)
+			// Add to failed events list
+			failedEventUpdates = append(failedEventUpdates, GenerateEventErrorUpdate(dbEvent.ID, dbEvent.Retries, err))
+			continue
 		}
 
 		if processedEvent != nil {
-			a.logger.Info("processed event", "event_id", dbEvent.ID, "event_type", dbEvent.EventType, "table", dbEvent.RowTableName, "processed_event", processedEvent)
-			// Add to send list and mark for deletion
+			a.logger.Info("processed event", "event_id", dbEvent.ID, "event_type", dbEvent.EventType, "table", dbEvent.RowTableName)
+			// Add to send list
 			processedEvents = append(processedEvents, processedEvent)
 		} else {
 			a.logger.Info("skipping event", "event_id", dbEvent.ID, "event_type", dbEvent.EventType, "table", dbEvent.RowTableName)
 		}
 	}
 
-	// Only send events if there are any to send
+	// Only send processed events if there are any to send
 	if len(processedEvents) > 0 {
 		a.logger.Info("sending processed events to destinations", "count", len(processedEvents))
-		if err := a.sendProcessedEvents(ctx, processedEvents); err != nil {
-			tx.Rollback(ctx)
-			a.logger.Error("failed to send processed events to destinations", "error", err)
-			return false, err
+		eventErrors, err := a.sendProcessedEvents(ctx, processedEvents)
+		if err != nil {
+			// Handle top-level error for all processed events
+			return a.handleBatchError(ctx, tx, eventIds, eventRetriesMap, err)
+		} else if len(eventErrors) > 0 {
+			// Handle individual event errors
+			a.logger.Info("some events failed to send", "error_count", len(eventErrors))
+			failedEventUpdates = append(failedEventUpdates, a.generateUpdatesFromErrors(eventErrors, eventRetriesMap)...)
+		} else {
+			a.logger.Info("successfully sent processed events to destinations", "count", len(processedEvents))
 		}
-		a.logger.Info("successfully sent processed events to destinations", "count", len(processedEvents))
 	} else {
-		a.logger.Info("no events to send to destinations (all raw events excluded)")
+		a.logger.Info("no processed events to send to destinations")
 	}
 
+	// Send DB events to destinations
 	a.logger.Info("sending db events to destinations", "count", len(dbEvents))
-	if err := a.sendDBEvents(ctx, dbEvents); err != nil {
-		tx.Rollback(ctx)
-		a.logger.Error("failed to send db events to destinations", "error", err)
-		return false, err
+	dbEventErrors, err := a.sendDBEvents(ctx, dbEvents)
+	if err != nil {
+		// Handle top-level error for all db events
+		return a.handleBatchError(ctx, tx, eventIds, eventRetriesMap, err)
+	} else if len(dbEventErrors) > 0 {
+		// Handle individual event errors
+		a.logger.Info("some db events failed to send", "error_count", len(dbEventErrors))
+		failedEventUpdates = append(failedEventUpdates, a.generateUpdatesFromErrors(dbEventErrors, eventRetriesMap)...)
+	} else {
+		a.logger.Info("successfully sent db events to destinations", "count", len(dbEvents))
 	}
-	a.logger.Info("successfully sent db events to destinations", "count", len(dbEvents))
 
-	// Flush all processed events, including excluded ones
-	a.logger.Info("flushing processed events", "count", len(eventIds))
-	if err := db.FlushDBEvents(ctx, tx, eventIds); err != nil {
-		tx.Rollback(ctx)
-		a.logger.Error("failed to delete processed events", "error", err)
-		return false, err
-	}
-	a.logger.Info("flushed processed events", "count", len(eventIds))
-
-	// Return true if we processed a full batch (indicating there might be more events)
-	return len(dbEvents) == a.cfg.BatchSize, nil
+	// Handle failed events and commit successful ones
+	return a.finalizeEventBatch(ctx, tx, eventIds, failedEventUpdates)
 }
 
-func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.ProcessedEvent) error {
+// handleBatchError handles top-level errors that affect all events in a batch
+func (a *Agent) handleBatchError(ctx context.Context, tx pgx.Tx, eventIds []int64, eventRetriesMap map[int64]int, err error) (bool, error) {
+	a.logger.Error("top-level error sending events to destinations", "error", err)
+
+	// Generate and merge updates for all failed events
+	failedUpdates := GenerateEventErrorUpdates(eventIds, eventRetriesMap, err)
+	mergedUpdates := MergeEventErrorUpdates(failedUpdates)
+	if updateErr := db.UpdateDBEvents(ctx, tx, mergedUpdates); updateErr != nil {
+		tx.Rollback(ctx)
+		a.logger.Error("failed to update event errors", "error", updateErr)
+		return false, updateErr
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		a.logger.Error("failed to commit transaction with only failed events", "error", err)
+		return false, err
+	}
+	return false, err
+}
+
+// generateUpdatesFromErrors converts destination event errors to DB event updates
+func (a *Agent) generateUpdatesFromErrors(eventErrors []*destinations.DestinationEventError, eventRetriesMap map[int64]int) []*eventmodels.DBEventUpdate {
+	updates := make([]*eventmodels.DBEventUpdate, 0, len(eventErrors))
+	for _, eventError := range eventErrors {
+		updates = append(updates,
+			GenerateEventErrorUpdate(eventError.EventID, eventRetriesMap[eventError.EventID], eventError.Error))
+	}
+	return updates
+}
+
+// finalizeEventBatch handles failed event updates and flushes successful events
+func (a *Agent) finalizeEventBatch(ctx context.Context, tx pgx.Tx, eventIds []int64, failedEventUpdates []*eventmodels.DBEventUpdate) (bool, error) {
+	// Update any failed events with error information
+	if len(failedEventUpdates) > 0 {
+		// Merge updates for the same event ID to handle multiple failures for the same event
+		mergedFailedUpdates := MergeEventErrorUpdates(failedEventUpdates)
+
+		a.logger.Info("updating failed events",
+			"original_count", len(failedEventUpdates),
+			"merged_count", len(mergedFailedUpdates),
+			"unique_events", len(mergedFailedUpdates))
+
+		if err := db.UpdateDBEvents(ctx, tx, mergedFailedUpdates); err != nil {
+			tx.Rollback(ctx)
+			a.logger.Error("failed to update failed events", "error", err)
+			return false, err
+		}
+
+		// Remove failed event IDs from the list to flush
+		failedIDs := make(map[int64]bool)
+		for _, update := range mergedFailedUpdates {
+			failedIDs[update.ID] = true
+		}
+
+		successfulIDs := make([]int64, 0, len(eventIds)-len(failedIDs))
+		for _, id := range eventIds {
+			if !failedIDs[id] {
+				successfulIDs = append(successfulIDs, id)
+			}
+		}
+
+		eventIds = successfulIDs
+	}
+
+	// Flush successful events
+	if len(eventIds) > 0 {
+		a.logger.Info("flushing successful events", "count", len(eventIds))
+		if err := db.FlushDBEvents(ctx, tx, eventIds); err != nil {
+			tx.Rollback(ctx)
+			a.logger.Error("failed to delete processed events", "error", err)
+			return false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			a.logger.Error("failed to commit transaction with successful events", "error", err)
+			return false, err
+		}
+		a.logger.Info("flushed successful events", "count", len(eventIds))
+	} else if len(failedEventUpdates) > 0 {
+		// If we have failed events but no successful ones, commit the transaction to save the updates
+		if err := tx.Commit(ctx); err != nil {
+			a.logger.Error("failed to commit transaction with only failed events", "error", err)
+			return false, err
+		}
+		a.logger.Info("committed transaction with updates for failed events")
+	}
+
+	// Return true if we processed a full batch (indicating there might be more events)
+	return len(eventIds) == a.cfg.BatchSize, nil
+}
+
+func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.ProcessedEvent) ([]*destinations.DestinationEventError, error) {
+	var allEventErrors []*destinations.DestinationEventError
+
 	for _, destination := range a.processedEventDestinations {
 		filteredEvents := events
 		if destination.Filter != "*" {
@@ -226,16 +331,26 @@ func (a *Agent) sendProcessedEvents(ctx context.Context, events []*eventmodels.P
 			continue
 		}
 		a.logger.Info("sending events to destination", "destination", destination.Kind, "count", len(filteredEvents))
-		if err := destination.Destination.SendBatch(ctx, filteredEvents); err != nil {
+		eventErrors, err := destination.Destination.SendBatch(ctx, filteredEvents)
+		if err != nil {
 			a.logger.Error("failed to send events to destination", "error", err)
-			return err
+			return nil, err
 		}
-		a.logger.Info("successfully sent events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+
+		if len(eventErrors) > 0 {
+			a.logger.Info("some events failed to send to destination", "destination", destination.Kind, "error_count", len(eventErrors))
+			allEventErrors = append(allEventErrors, eventErrors...)
+		} else {
+			a.logger.Info("successfully sent events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+		}
 	}
-	return nil
+
+	return allEventErrors, nil
 }
 
-func (a *Agent) sendDBEvents(ctx context.Context, events []*eventmodels.DBEvent) error {
+func (a *Agent) sendDBEvents(ctx context.Context, events []*eventmodels.DBEvent) ([]*destinations.DestinationEventError, error) {
+	var allEventErrors []*destinations.DestinationEventError
+
 	for _, destination := range a.dbEventDestinations {
 		filteredEvents := events
 		if destination.Filter != "*" {
@@ -246,13 +361,21 @@ func (a *Agent) sendDBEvents(ctx context.Context, events []*eventmodels.DBEvent)
 			continue
 		}
 		a.logger.Info("sending events to destination", "destination", destination.Kind, "count", len(filteredEvents))
-		if err := destination.Destination.SendBatch(ctx, filteredEvents); err != nil {
+		eventErrors, err := destination.Destination.SendBatch(ctx, filteredEvents)
+		if err != nil {
 			a.logger.Error("failed to send events to destination", "error", err)
-			return err
+			return nil, err
 		}
-		a.logger.Info("successfully sent events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+
+		if len(eventErrors) > 0 {
+			a.logger.Info("some events failed to send to destination", "destination", destination.Kind, "error_count", len(eventErrors))
+			allEventErrors = append(allEventErrors, eventErrors...)
+		} else {
+			a.logger.Info("successfully sent events to destination", "destination", destination.Kind, "count", len(filteredEvents))
+		}
 	}
-	return nil
+
+	return allEventErrors, nil
 }
 
 func (a *Agent) filterProcessedEvents(events []*eventmodels.ProcessedEvent, filter string) []*eventmodels.ProcessedEvent {

@@ -36,6 +36,10 @@ var (
 		"user":   {},
 		"_users": {},
 	}
+
+	protojsonUnmarshaler = protojson.UnmarshalOptions{
+		DiscardUnknown: true,
+	}
 )
 
 func ProcessEvent(dbEvent *eventmodels.DBEvent, cfg *config.EventStreamingConfig, pbPkgName *string, pbFd protoreflect.FileDescriptor) (*eventmodels.ProcessedEvent, error) {
@@ -272,7 +276,7 @@ func marshalToProtobuf(data json.RawMessage, tableName string, fd protoreflect.F
 	msg := dynamicpb.NewMessage(msgDesc)
 
 	// Unmarshal JSON into the protobuf message
-	if err := protojson.Unmarshal(data, msg); err != nil {
+	if err := protojsonUnmarshaler.Unmarshal(data, msg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON to protobuf: %w", err)
 	}
 

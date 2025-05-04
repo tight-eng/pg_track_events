@@ -66,9 +66,9 @@ type bigqueryEvent struct {
 }
 
 // SendBatch sends a batch of processed events to BigQuery
-func (b *BigQueryDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) error {
+func (b *BigQueryDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) ([]*DestinationEventError, error) {
 	if len(processedEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	b.logger.Info("sending events to BigQuery", "count", len(processedEvents))
@@ -79,7 +79,7 @@ func (b *BigQueryDestination) SendBatch(ctx context.Context, processedEvents []*
 		evtPropsJson, err := json.Marshal(event.Properties)
 		if err != nil {
 			b.logger.Error("failed to marshal properties", "error", err, "event", event)
-			return fmt.Errorf("failed to marshal properties: %w", err)
+			return nil, fmt.Errorf("failed to marshal properties: %w", err)
 		}
 		bigqueryEvents[i] = &bigqueryEvent{
 			ID:          event.DBEventIDStr,
@@ -101,9 +101,9 @@ func (b *BigQueryDestination) SendBatch(ctx context.Context, processedEvents []*
 	// Insert the events
 	if err := inserter.Put(ctx, bigqueryEvents); err != nil {
 		b.logger.Error("failed to insert events to BigQuery", "error", err)
-		return fmt.Errorf("failed to insert events to BigQuery: %w", err)
+		return nil, fmt.Errorf("failed to insert events to BigQuery: %w", err)
 	}
 
 	b.logger.Info("successfully sent events to BigQuery", "count", len(processedEvents))
-	return nil
+	return nil, nil
 }

@@ -38,6 +38,7 @@ type S3RawDBEventDestination struct {
 	logger       *slog.Logger
 	buffers      map[string]*s3Buffer
 	buffersMutex sync.Mutex
+	flushOnBatch bool // Flag to control if batches should be flushed immediately
 }
 
 // s3Buffer represents a buffer for a specific table that writes to a specific S3 path
@@ -75,7 +76,7 @@ func NewS3RawDBEventDestination(
 		return nil, fmt.Errorf("bucket is required")
 	}
 	if rootDir == "" {
-		return nil, fmt.Errorf("root directory is required")
+		rootDir = "./"
 	}
 
 	// Generate a unique agent ID if not provided
@@ -107,12 +108,13 @@ func NewS3RawDBEventDestination(
 	client := s3.NewFromConfig(cfg)
 
 	s3Dest := &S3RawDBEventDestination{
-		client:  client,
-		bucket:  bucket,
-		rootDir: rootDir,
-		agentID: agentID,
-		logger:  logger,
-		buffers: make(map[string]*s3Buffer),
+		client:       client,
+		bucket:       bucket,
+		rootDir:      rootDir,
+		agentID:      agentID,
+		logger:       logger,
+		buffers:      make(map[string]*s3Buffer),
+		flushOnBatch: true, // Default to true for persistence guarantee
 	}
 
 	// Verify S3 connection and bucket access
@@ -263,9 +265,9 @@ func (s *S3RawDBEventDestination) uploadWithRetries(ctx context.Context, s3Key s
 }
 
 // SendBatch sends a batch of DB events to S3
-func (s *S3RawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eventmodels.DBEvent) error {
+func (s *S3RawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eventmodels.DBEvent) ([]*DestinationEventError, error) {
 	if len(dbEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	s.logger.Info("processing DB events for S3", "count", len(dbEvents))
@@ -300,15 +302,15 @@ func (s *S3RawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eve
 			// Serialize to JSON and write to buffer
 			data, err := json.Marshal(s3Event)
 			if err != nil {
-				return fmt.Errorf("failed to marshal event to JSON: %w", err)
+				return nil, fmt.Errorf("failed to marshal event to JSON: %w", err)
 			}
 
 			// Write line to buffer
 			if _, err := buffer.writer.Write(data); err != nil {
-				return fmt.Errorf("failed to write to buffer: %w", err)
+				return nil, fmt.Errorf("failed to write to buffer: %w", err)
 			}
 			if _, err := buffer.writer.Write([]byte("\n")); err != nil {
-				return fmt.Errorf("failed to write newline to buffer: %w", err)
+				return nil, fmt.Errorf("failed to write newline to buffer: %w", err)
 			}
 
 			buffer.eventsCount++
@@ -316,27 +318,36 @@ func (s *S3RawDBEventDestination) SendBatch(ctx context.Context, dbEvents []*eve
 			// Flush to S3 if buffer is full
 			if buffer.eventsCount >= maxEventsPerFile {
 				if err := s.flushBuffer(ctx, tableName); err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	// We'll only automatically flush if we have a reasonable amount of events
-	// Otherwise, we'll wait for more events to accumulate or for an explicit FlushAll call
-	for tableName, buffer := range s.buffers {
-		if buffer.eventsCount >= defaultBatchSize {
+	// If flushOnBatch is true, flush all modified buffers
+	if s.flushOnBatch {
+		for tableName := range tableEvents {
 			if err := s.flushBuffer(ctx, tableName); err != nil {
-				return err
+				return nil, err
+			}
+		}
+	} else {
+		// We'll only automatically flush if we have a reasonable amount of events
+		// Otherwise, we'll wait for more events to accumulate or for an explicit FlushAll call
+		for tableName, buffer := range s.buffers {
+			if buffer.eventsCount >= defaultBatchSize {
+				if err := s.flushBuffer(ctx, tableName); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // FlushAll flushes all buffers to S3
-func (s *S3RawDBEventDestination) FlushAll(ctx context.Context) error {
+func (s *S3RawDBEventDestination) FlushAll(ctx context.Context) ([]*DestinationEventError, error) {
 	s.buffersMutex.Lock()
 	tableNames := make([]string, 0, len(s.buffers))
 	for tableName := range s.buffers {
@@ -346,15 +357,15 @@ func (s *S3RawDBEventDestination) FlushAll(ctx context.Context) error {
 
 	for _, tableName := range tableNames {
 		if err := s.flushBuffer(ctx, tableName); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Close flushes all buffers and cleans up resources
-func (s *S3RawDBEventDestination) Close(ctx context.Context) error {
+func (s *S3RawDBEventDestination) Close(ctx context.Context) ([]*DestinationEventError, error) {
 	return s.FlushAll(ctx)
 }
 
@@ -368,7 +379,7 @@ func (s *S3RawDBEventDestination) StartPeriodicFlush(flushInterval time.Duration
 		for {
 			select {
 			case <-ticker.C:
-				if err := s.FlushAll(ctx); err != nil {
+				if _, err := s.FlushAll(ctx); err != nil {
 					s.logger.Error("failed to flush S3 buffers", "error", err)
 				}
 			case <-ctx.Done():
@@ -381,4 +392,11 @@ func (s *S3RawDBEventDestination) StartPeriodicFlush(flushInterval time.Duration
 	return func() {
 		cancel()
 	}
+}
+
+// SetFlushOnBatch sets the flushOnBatch flag
+func (s *S3RawDBEventDestination) SetFlushOnBatch(flush bool) {
+	s.buffersMutex.Lock()
+	defer s.buffersMutex.Unlock()
+	s.flushOnBatch = flush
 }

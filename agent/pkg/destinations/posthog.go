@@ -38,9 +38,9 @@ func NewPostHogDestination(apiKey string, endpoint string, logger *slog.Logger) 
 }
 
 // SendBatch sends a batch of processed events to PostHog
-func (p *PostHogDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) error {
+func (p *PostHogDestination) SendBatch(ctx context.Context, processedEvents []*eventmodels.ProcessedEvent) ([]*DestinationEventError, error) {
 	if len(processedEvents) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	p.logger.Info("sending events to PostHog", "count", len(processedEvents))
@@ -55,10 +55,10 @@ func (p *PostHogDestination) SendBatch(ctx context.Context, processedEvents []*e
 		})
 		if err != nil {
 			p.logger.Error("failed to send event to PostHog", "error", err, "event_id", event.DBEventID)
-			return fmt.Errorf("failed to send event to PostHog: %w", err)
+			return nil, fmt.Errorf("failed to send event to PostHog: %w", err)
 		}
 	}
 
 	p.logger.Info("successfully sent events to PostHog", "count", len(processedEvents))
-	return nil
+	return nil, nil
 }
