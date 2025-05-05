@@ -93,7 +93,8 @@ jobs:
         with:
           context: ./agent
           push: true
-          platforms: linux/amd64,linux/arm64
+          # TODO: Add linux/arm64 at some point, but currently takes too long to build on the default gh runners
+          platforms: linux/amd64
           tags: |
             ghcr.io/${{ github.repository }}/agent:latest
             ghcr.io/${{ github.repository }}/agent:${{ steps.tag.outputs.VERSION }}
