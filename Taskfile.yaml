@@ -21,7 +21,7 @@ tasks:
     desc: Build and copy cli
     deps: [build-wasm]
     cmds:
-      - cp ./agent/internal/db/queries/introspect_pg.sql ./cli/sql_functions/introspect_pg.sql
+      - cp ./agent/internal/db/queries/introspect_pg.sql ./cli/wasm/introspect_pg.sql
       # - cd cli && bun run build
       # - cd cli && npm publish
 
@@ -29,8 +29,8 @@ tasks:
     desc: Build and publish CLI to GitHub Packages
     deps: [build-cli]
     cmds:
-      - cd cli && bun build index.ts --target bun-linux-x64-modern --compile --outfile dist/pg_track_events-cli-linux-x64-modern wasm/**
-      - cd cli && bun build index.ts --target bun-linux-arm64 --compile --outfile dist/pg_track_events-cli-linux-arm64 wasm/**
-      - cd cli && bun build index.ts --target bun-windows-x64 --compile --outfile dist/pg_track_events-cli-windows-x64 wasm/**
-      - cd cli && bun build index.ts --target bun-darwin-x64 --compile --outfile dist/pg_track_events-cli-darwin-x64 wasm/**
-      - cd cli && bun build index.ts --target bun-darwin-arm64 --compile --outfile dist/pg_track_events-cli-darwin-arm64 wasm/**
+      - cd cli && bun build index.ts --target bun-linux-x64-modern --compile --asset-naming="[name].[ext]" --outfile dist/pg_track_events-cli-linux-x64-modern wasm/**
+      - cd cli && bun build index.ts --target bun-linux-arm64 --compile --asset-naming="[name].[ext]" --outfile dist/pg_track_events-cli-linux-arm64 wasm/**
+      - cd cli && bun build index.ts --target bun-windows-x64 --compile --asset-naming="[name].[ext]" --outfile dist/pg_track_events-cli-windows-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-x64 --compile --asset-naming="[name].[ext]" --outfile dist/pg_track_events-cli-darwin-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-arm64 --compile --asset-naming="[name].[ext]" --outfile dist/pg_track_events-cli-darwin-arm64 wasm/**
