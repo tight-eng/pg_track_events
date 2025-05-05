@@ -29,3 +29,17 @@ jobs:
 
       - name: Build and publish CLI
         run: task publish-cli
+
+      - name: Get version from package.json
+        id: get_version
+        run: echo "VERSION=$(jq -r .version cli/package.json)" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: v${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
+          files: cli/dist/pg_track_events
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
