@@ -17,45 +17,53 @@ export function logChangesBuilder(
 
   const functionBody = `-- Generic trigger function for insert, update, and delete
 CREATE OR REPLACE FUNCTION ${functionName}()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SECURITY DEFINER
+AS $$
 BEGIN
-    IF (TG_OP = 'INSERT') THEN
-        INSERT INTO schema_pg_track_events.event_log (
-            event_type,
-            row_table_name,
-            old_row,
-            new_row
-        ) VALUES (
-            'insert',
-            TG_TABLE_NAME,
-            NULL,
-            ${jsonBuildObject("NEW")}
-        );
-    ELSIF (TG_OP = 'UPDATE') THEN
-        INSERT INTO schema_pg_track_events.event_log (
-            event_type,
-            row_table_name,
-            old_row,
-            new_row
-        ) VALUES (
-            'update',
-            TG_TABLE_NAME,
-            ${jsonBuildObject("OLD")},
-            ${jsonBuildObject("NEW")}
-        );
-    ELSIF (TG_OP = 'DELETE') THEN
-        INSERT INTO schema_pg_track_events.event_log (
-            event_type,
-            row_table_name,
-            old_row,
-            new_row
-        ) VALUES (
-            'delete',
-            TG_TABLE_NAME,
-            ${jsonBuildObject("OLD")},
-            NULL
-        );
-    END IF;
+    BEGIN
+        IF (TG_OP = 'INSERT') THEN
+            INSERT INTO schema_pg_track_events.event_log (
+                event_type,
+                row_table_name,
+                old_row,
+                new_row
+            ) VALUES (
+                'insert',
+                TG_TABLE_NAME,
+                NULL,
+                ${jsonBuildObject("NEW")}
+            );
+        ELSIF (TG_OP = 'UPDATE') THEN
+            INSERT INTO schema_pg_track_events.event_log (
+                event_type,
+                row_table_name,
+                old_row,
+                new_row
+            ) VALUES (
+                'update',
+                TG_TABLE_NAME,
+                ${jsonBuildObject("OLD")},
+                ${jsonBuildObject("NEW")}
+            );
+        ELSIF (TG_OP = 'DELETE') THEN
+            INSERT INTO schema_pg_track_events.event_log (
+                event_type,
+                row_table_name,
+                old_row,
+                new_row
+            ) VALUES (
+                'delete',
+                TG_TABLE_NAME,
+                ${jsonBuildObject("OLD")},
+                NULL
+            );
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error to PostgreSQL's error log
+        RAISE WARNING 'Error in ${functionName}: %', SQLERRM;
+        -- Return NULL to allow the original operation to proceed
+    END;
 
     RETURN NULL;
 END;
