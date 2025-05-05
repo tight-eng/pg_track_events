@@ -39,7 +39,7 @@ jobs:
         with:
           name: v${{ env.VERSION }}
           tag_name: v${{ env.VERSION }}
-          files: cli/dist/pg_track_events
+          files: cli/dist/**
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

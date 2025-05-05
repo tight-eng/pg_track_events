@@ -29,4 +29,8 @@ tasks:
     desc: Build and publish CLI to GitHub Packages
     deps: [build-cli]
     cmds:
-      - cd cli && bun build index.ts --compile --outfile dist/pg_track_events wasm/**
+      - cd cli && bun build index.ts --target bun-linux-x64-modern --compile --outfile dist/pg_track_events-linux-x64-modern wasm/**
+      - cd cli && bun build index.ts --target bun-linux-arm64 --compile --outfile dist/pg_track_events-linux-arm64 wasm/**
+      - cd cli && bun build index.ts --target bun-windows-x64 --compile --outfile dist/pg_track_events-windows-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-x64 --compile --outfile dist/pg_track_events-darwin-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-arm64 --compile --outfile dist/pg_track_events-darwin-arm64 wasm/**
