@@ -1,0 +1,23 @@
+{
+    "title": "pg_track_events",
+    "description": "pg_track_events emits analytics events as your data changes",
+    "icon": "Building2",
+    "root": true,
+    "pages": [
+        "---Introduction---",
+        "index",
+        "what-is-pg_track_events",
+        "comparisons",
+        "---Setup---",
+        "quickstart",
+        "supabase-installation",
+        "---Usage---",
+        "event-transformations",
+        "---Destinations---",
+        "(destinations)/mixpanel",
+        "(destinations)/posthog",
+        "(destinations)/amplitude",
+        "(destinations)/google-bigquery",
+        "(destinations)/aws-s3"
+    ]
+}
