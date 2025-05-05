@@ -8,7 +8,7 @@
     "dev": "npm run copy-readme && next dev --turbo",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
-    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:build": "npm run copy-readme && npx @cloudflare/next-on-pages",
     "preview": "npm run pages:build && wrangler pages dev",
     "deploy": "npm run pages:build && wrangler pages deploy"
   },
