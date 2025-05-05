@@ -61,7 +61,7 @@ export async function addTriggersForNewTables(
       JOIN pg_namespace n ON p.pronamespace = n.oid
       WHERE t.trigger_schema = 'public'
           AND t.event_object_table = ${table}
-          AND t.trigger_name = ${table + "_audit_trigger"}
+          AND t.trigger_name = ${`"${table}_audit_trigger"`}
           AND n.nspname = 'schema_pg_track_events';
     `;
 
@@ -125,7 +125,7 @@ export async function addTriggersForNewTables(
   for (const table of fullyIgnoredTables) {
     if (tablesWithTriggers.includes(table)) {
       sqlBuilder.add(
-        `DROP TRIGGER IF EXISTS ${table}_audit_trigger ON public.${table};`,
+        `DROP TRIGGER IF EXISTS "${table}_audit_trigger" ON public."${table}";`,
         `${kleur.dim("-")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(
           "will be removed from"
         )} ${kleur.bold(table)} ${kleur.dim("table (ignored in yaml config)")}`
@@ -208,8 +208,8 @@ export async function addTriggersForNewTables(
       )} ${kleur.bold(table)} table trigger`
     );
     sqlBuilder.add(
-      `CREATE OR REPLACE TRIGGER ${table}_audit_trigger
-      AFTER INSERT OR UPDATE OR DELETE ON public.${table}
+      `CREATE OR REPLACE TRIGGER "${table}_audit_trigger"
+      AFTER INSERT OR UPDATE OR DELETE ON public."${table}"
       FOR EACH ROW
       EXECUTE FUNCTION ${functionName}();`,
       `${kleur.dim("+")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(

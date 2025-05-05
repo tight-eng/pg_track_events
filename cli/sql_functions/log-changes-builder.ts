@@ -1,5 +1,5 @@
 export function tableNameToAuditFunctionName(tableName: string) {
-  return `schema_pg_track_events.log_${tableName}_changes`;
+  return `schema_pg_track_events.log_${tableName.toLowerCase()}_changes`;
 }
 
 export function logChangesBuilder(
@@ -8,11 +8,11 @@ export function logChangesBuilder(
 ) {
   const functionName = tableNameToAuditFunctionName(tableName);
 
-  // Create json_build_object string for columns
+  // Create json_build_object string for columns with proper quoting
   const jsonBuildObject = (prefix: "NEW" | "OLD") =>
     `json_build_object(${includedColumns
       .sort()
-      .map((col) => `'${col}', ${prefix}.${col}`)
+      .map((col) => `'${col}', ${prefix}."${col}"`)
       .join(", ")})`;
 
   const functionBody = `-- Generic trigger function for insert, update, and delete
@@ -74,8 +74,8 @@ $$ LANGUAGE plpgsql;`;
 
 export function extractColumnsFromFunction(query: string): Set<string> {
   // This regex looks for column names in a json_build_object format
-  // It matches patterns like: 'column_name', NEW.column_name
-  const regex = /'([^']+)',\s*(?:NEW|OLD)\.\1/g;
+  // It matches patterns like: 'column_name', NEW."column_name" or 'column_name', OLD."column_name"
+  const regex = /'([^']+)',\s*(?:NEW|OLD)\."\1"/g;
 
   const columnSet = new Set<string>();
   let match;

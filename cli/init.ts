@@ -121,8 +121,8 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
       )} ${kleur.bold(table)} table trigger`
     );
     sqlBuilder.add(
-      `CREATE OR REPLACE TRIGGER ${table}_audit_trigger
-    AFTER INSERT OR UPDATE OR DELETE ON public.${table}
+      `CREATE OR REPLACE TRIGGER "${table}_audit_trigger"
+    AFTER INSERT OR UPDATE OR DELETE ON public."${table}"
     FOR EACH ROW
     EXECUTE FUNCTION ${functionName}();`,
       `${kleur.dim("+")} ${kleur.bold(table + "_audit_trigger")} ${kleur.dim(
