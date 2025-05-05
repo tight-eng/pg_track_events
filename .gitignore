@@ -49,3 +49,7 @@ ngrok.yml
 cli/wasm
 
 cli/tight-analytics
+
+cli/sql_functions/introspect_pg.sql
+
+cli/dist

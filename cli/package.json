@@ -1,15 +1,18 @@
 {
-  "name": "tightdb",
-  "module": "index.ts",
+  "name": "pg_track_events",
+  "module": "dist/index.js",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "dev": "tsc --watch"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "files": ["dist/**", "wasm/**", "sql_functions/introspect_pg.sql"],
   "bin": {
-    "my-cli": "./index.ts"
+    "pg_track_events": "./dist/index.js"
   },
   "devDependencies": {
     "bun-types": "latest",

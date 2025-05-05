@@ -1,4 +1,3 @@
-import { readFile } from "fs/promises";
 import { join } from "path";
 import "../wasm/wasm_exec.js";
 
@@ -30,8 +29,9 @@ export async function initWasm() {
 
   const go = new Go(); // Provided by wasm_exec.js
 
-  const wasmPath = join(import.meta.dir, "../wasm/bin.wasm");
-  const wasmBytes = await readFile(wasmPath);
+  const wasmBytes = await Bun.file(
+    new URL("../wasm/bin.wasm", import.meta.url)
+  ).arrayBuffer();
 
   const result = await WebAssembly.instantiate(wasmBytes, go.importObject);
 
