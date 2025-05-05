@@ -200,7 +200,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     )
   );
 
-  console.log(`tight-analytics/
+  console.log(`pg_track_events/
 ├── pg_track_events.config.yaml  # Mapping of database changes to analytics events
 └── Dockerfile            # Agent container definition. Run this in your infrastructure.
   `);

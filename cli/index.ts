@@ -27,7 +27,7 @@ program
   .description("Test command that returns hello world")
   .action(async (options) => {
     const cwd = process.cwd();
-    const tightDir = path.join(cwd, "tight-analytics");
+    const tightDir = path.join(cwd, "pg_track_events");
 
     const [sql] = await getDBConnection();
 
@@ -77,7 +77,7 @@ program
         kleur.red(
           `${
             config.error.length
-          } validation errors found. Fix them before syncing.\n\ntight validate ${path.relative(
+          } validation errors found. Fix them before syncing.\n\npg_track_events validate ${path.relative(
             process.cwd(),
             configPath
           )}`
@@ -126,7 +126,7 @@ program
       console.log("\n");
       console.log(
         kleur.dim(
-          `Re-run "tight validate${
+          `Re-run "pg_track_events validate${
             configYml ? " " + configPath : ""
           }" to check again`
         )
@@ -219,7 +219,7 @@ async function getDBConnection(additionalPrompt: string = "") {
 async function getConfigPath(configYml: string): Promise<string> {
   const searchPaths = [
     ...(configYml ? [path.resolve(configYml)] : []),
-    path.join(process.cwd(), "tight-analytics", "pg_track_events.config.yaml"),
+    path.join(process.cwd(), "pg_track_events", "pg_track_events.config.yaml"),
     path.join(process.cwd(), "pg_track_events.config.yaml"),
   ];
 
@@ -239,7 +239,7 @@ async function getConfigPath(configYml: string): Promise<string> {
       )
     );
     console.log(
-      kleur.dim("\ntight [command] path/to/pg_track_events.config.yaml\n")
+      kleur.dim("\npg_track_events [command] path/to/pg_track_events.config.yaml\n")
     );
     process.exit(1);
   }
