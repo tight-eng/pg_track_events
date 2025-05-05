@@ -1,0 +1,26 @@
+FROM --platform=$TARGETPLATFORM alpine:3.21
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Create ARG for platform detection
+ARG TARGETPLATFORM
+
+# Copy the appropriate binary based on the platform architecture
+COPY bin/amd64/pg_track_events-agent-linux-amd64 /app/pg_track_events-agent-amd64
+COPY bin/arm64/pg_track_events-agent-linux-arm64 /app/pg_track_events-agent-arm64
+
+# Set up proper binary based on architecture
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+      cp /app/pg_track_events-agent-amd64 /app/pg_track_events-agent; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      cp /app/pg_track_events-agent-arm64 /app/pg_track_events-agent; \
+    else \
+      echo "Unsupported platform: $TARGETPLATFORM"; \
+      exit 1; \
+    fi && \
+    chmod +x /app/pg_track_events-agent && \
+    rm /app/pg_track_events-agent-amd64 /app/pg_track_events-agent-arm64
+
+# Command to run the executable
+CMD ["/app/pg_track_events-agent"] 
