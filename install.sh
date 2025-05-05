@@ -57,9 +57,9 @@ esac
 
 # Determine binary name
 if [ "$OS" = "windows" ]; then
-    BINARY_NAME="pg_track_events-${OS}-${ARCH}.exe"
+    BINARY_NAME="pg_track_events-cli-${OS}-${ARCH}.exe"
 else
-    BINARY_NAME="pg_track_events-${OS}-${ARCH}"
+    BINARY_NAME="pg_track_events-cli-${OS}-${ARCH}"
 fi
 
 # Get the latest release version

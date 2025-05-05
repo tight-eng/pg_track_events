@@ -5,8 +5,8 @@ on:
     types: [published]
 
 jobs:
-  build-binaries:
-    name: Build Cross-Platform Binaries
+  build-agent-binaries:
+    name: Build Cross-Platform Agent Binaries
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -44,9 +44,40 @@ jobs:
           path: agent/pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}*
           if-no-files-found: error
 
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.24"
+          check-latest: true
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+
+      - name: Build and publish CLI
+        run: task publish-cli
+
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-artifacts
+          path: cli/dist/**
+          if-no-files-found: error
+
   upload-to-release:
     name: Upload Binaries to Release
-    needs: build-binaries
+    needs: [build-agent-binaries, build-cli]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -64,8 +95,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-and-push-docker:
-    name: Build and Push Docker Image
+  build-and-push-agent-docker:
+    name: Build and Push Agent Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
