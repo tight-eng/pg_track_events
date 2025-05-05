@@ -14,6 +14,7 @@ import { dropTight } from "./drop";
 import { getIntrospectedSchema } from "./config/introspection";
 const program = new Command();
 
+
 program
   .name("init")
   .description("init in an instance of your database")
