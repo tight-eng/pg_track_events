@@ -6,7 +6,7 @@ import {
   DocsTitle,
 } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
-import { createRelativeLink } from 'fumadocs-ui/mdx';
+// import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { getMDXComponents } from '@/mdx-components';
 
 export default async function Page(props: {
@@ -25,8 +25,9 @@ export default async function Page(props: {
       <DocsBody>
         <MDXContent
           components={getMDXComponents({
+            // NOTE Commented out for compatibility with Cloudflare Pages edge runtime (Error: `createRelativeLink` is only supported in Node.js environment)
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            // a: createRelativeLink(source, page),
           })}
         />
       </DocsBody>
@@ -34,9 +35,10 @@ export default async function Page(props: {
   );
 }
 
-export async function generateStaticParams() {
-  return source.generateParams();
-}
+// NOTE Commented out for compatibility with Cloudflare Pages edge runtime
+// export async function generateStaticParams() {
+//   return source.generateParams();
+// }
 
 export async function generateMetadata(props: {
   params: Promise<{ slug?: string[] }>;
@@ -50,3 +52,5 @@ export async function generateMetadata(props: {
     description: page.data.description,
   };
 }
+
+export const runtime = "edge";

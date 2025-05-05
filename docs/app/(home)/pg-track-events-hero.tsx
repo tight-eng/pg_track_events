@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Database, Zap, Send, ArrowRight, Code } from 'lucide-react';
+import { Database, Zap, Send } from 'lucide-react';
 
 const PgTrackEventsHero = () => {
   const [step, setStep] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(true);
+  const autoPlay = true;
 
   // Clear animation cycle and restart
   useEffect(() => {

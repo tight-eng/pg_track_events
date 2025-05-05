@@ -1,0 +1,4 @@
+name = "pg_track_events-docs"
+compatibility_date = "2025-05-05"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"

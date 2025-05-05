@@ -7,7 +7,10 @@
     "copy-readme": "cp ../README.md content/docs/index.mdx && echo \"---\\ntitle: 'Introduction'\\ndescription: 'Emit analytics events as your data changes'\\n---\\n$(cat content/docs/index.mdx)\" > content/docs/index.mdx",
     "dev": "npm run copy-readme && next dev --turbo",
     "start": "next start",
-    "postinstall": "fumadocs-mdx"
+    "postinstall": "fumadocs-mdx",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "preview": "npm run pages:build && wrangler pages dev",
+    "deploy": "npm run pages:build && wrangler pages deploy"
   },
   "dependencies": {
     "framer-motion": "^12.9.4",
@@ -20,6 +23,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.12",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/mdx": "^2.0.13",
     "@types/node": "22.15.2",
@@ -29,6 +33,8 @@
     "eslint-config-next": "15.3.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vercel": "^41.7.0",
+    "wrangler": "^4.14.1"
   }
 }
