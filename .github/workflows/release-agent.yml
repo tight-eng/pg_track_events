@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.20'
           cache: true
 
       - name: Build binary
@@ -35,13 +35,13 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             EXTENSION=".exe"
           fi
-          go build -o "pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
+          go build -o "tightdb-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
 
       - name: Upload binary to artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: agent/pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}*
+          name: tightdb-agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: agent/tightdb-agent-${{ matrix.goos }}-${{ matrix.goarch }}*
           if-no-files-found: error
 
   upload-to-release:
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
@@ -94,4 +94,4 @@ jobs:
             ghcr.io/${{ github.repository }}/agent:${{ steps.tag.outputs.VERSION }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.tag.outputs.VERSION }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.VERSION }} 
