@@ -49,7 +49,8 @@ type Table = {
 export type DatabaseSchema = Table[];
 
 export async function getIntrospectedSchema(sql: SQL): Promise<DatabaseSchema> {
-  const result = await sql.file("../agent/internal/db/queries/introspect_pg.sql");
+  const introspectPgSql = await Bun.file(new URL("../sql_functions/introspect_pg.sql", import.meta.url)).text();
+  const result = await sql.unsafe(introspectPgSql);
   return JSON.parse(result[0].schema_json);
 }
 
