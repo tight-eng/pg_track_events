@@ -23,6 +23,10 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 ### Quick Start
 
 ```bash
+curl -sSL https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/install.sh | bash
+```
+
+```bash
 # TODO Run the CLI init command
 # TODO cd into the directory with the newly-generated Dockerfile and pg_track_events.config.yaml
 

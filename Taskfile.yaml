@@ -13,15 +13,24 @@ tasks:
     cmds:
       - cd agent && GOOS=js GOARCH=wasm go build -o bin/wasmlib/bin.wasm ./pkg/wasmlib/main.go
       - cd agent && cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" bin/wasmlib
-
-  copy-wasm:
-    desc: Copy WASM files to CLI directory
-    deps: [build-wasm]
-    cmds:
       - mkdir -p cli/wasm
       - cp agent/bin/wasmlib/bin.wasm cli/wasm/
       - cp agent/bin/wasmlib/wasm_exec.js cli/wasm/
 
-  wasm:
-    desc: Build and copy WASM files
-    deps: [copy-wasm]
+  build-cli:
+    desc: Build and copy cli
+    deps: [build-wasm]
+    cmds:
+      - cp ./agent/internal/db/queries/introspect_pg.sql ./cli/sql_functions/introspect_pg.sql
+      # - cd cli && bun run build
+      # - cd cli && npm publish
+
+  publish-cli:
+    desc: Build and publish CLI to GitHub Packages
+    deps: [build-cli]
+    cmds:
+      - cd cli && bun build index.ts --target bun-linux-x64-modern --compile --outfile dist/pg_track_events-linux-x64-modern wasm/**
+      - cd cli && bun build index.ts --target bun-linux-arm64 --compile --outfile dist/pg_track_events-linux-arm64 wasm/**
+      - cd cli && bun build index.ts --target bun-windows-x64 --compile --outfile dist/pg_track_events-windows-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-x64 --compile --outfile dist/pg_track_events-darwin-x64 wasm/**
+      - cd cli && bun build index.ts --target bun-darwin-arm64 --compile --outfile dist/pg_track_events-darwin-arm64 wasm/**
