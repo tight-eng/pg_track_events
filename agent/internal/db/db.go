@@ -53,10 +53,10 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf(`
-		SELECT id, event_type, row_table_name, logged_at, retries, last_error, last_retry_at, next_retry_at, old_row, new_row
+		SELECT id, event_type, row_table_name, logged_at, retries, last_error, last_retry_at, process_after, old_row, new_row
 		FROM %s
-		WHERE (next_retry_at IS NULL OR next_retry_at < $1)
-		ORDER BY id ASC
+		WHERE process_after < $1
+		ORDER BY process_after
 		FOR UPDATE SKIP LOCKED
 		LIMIT $2
 	`, tableName)
@@ -82,7 +82,7 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 			&event.Retries,
 			&event.LastError,
 			&event.LastRetryAt,
-			&event.NextRetryAt,
+			&event.ProcessAfter,
 			&oldRow,
 			&newRow,
 		); err != nil {
@@ -126,13 +126,13 @@ func UpdateDBEvents(ctx context.Context, tx pgx.Tx, updates []*eventmodels.DBEve
 	// Create query for each update
 	baseQuery := fmt.Sprintf(`
 		UPDATE %s
-		SET retries = $1, last_error = $2, last_retry_at = $3, next_retry_at = $4
+		SET retries = $1, last_error = $2, last_retry_at = $3, process_after = $4
 		WHERE id = $5
 	`, tableName)
 
 	// Add each update to the batch
 	for _, update := range updates {
-		batch.Queue(baseQuery, update.Retries, update.LastError, update.LastRetryAt, update.NextRetryAt, update.ID)
+		batch.Queue(baseQuery, update.Retries, update.LastError, update.LastRetryAt, update.ProcessAfter, update.ID)
 	}
 
 	// Execute all updates as a batch

@@ -1,13 +1,8 @@
----
-title: schema_pg_track_events
-description: Emits analytics events as your data changes
----
-
-# schema_pg_track_events
+# pg_track_events
 
 **Your database knows what happened — why aren’t you listening?**
 
-`schema_pg_track_events` emits analytics events as your data changes. This repo has the tools you need to map row changes into analytics events, and then stream them to tools like PostHog, Mixpanel, Segment, and BigQuery. Every query you run tells you something about your app and users so stop throwing them away.
+`pg_track_events` emits analytics events as your data changes. This repo has the tools you need to map row changes into analytics events, and then stream them to tools like PostHog, Mixpanel, Segment, and BigQuery. Every query you run tells you something about your app and users so stop throwing them away.
 
 ### Features
 
@@ -21,13 +16,23 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ⚡️ **Easy setup, then scalable** — start with Postgres triggers (1-3% slower writes[run benchmarks]), scale to WAL and replicas if needed.
 
-⏱️ **Time travel** — stop waiting for data because you forgot to track something. New analytic events can backfill their history by looking at WAL logs.
-
 ### How it works
 
 [digram]
 
 ### Quick Start
+
+```bash
+# TODO Run the CLI init command
+# TODO cd into the directory with the newly-generated Dockerfile and pg_track_events.config.yaml
+
+# Build image
+docker build -t pg_track_events_agent .
+
+# Run image (interactive mode, for testing)
+# The POSTHOG_API_KEY is just an example, you'll need to pass in whatever env vars you're referencing from your pg_track_events.config.yaml file
+docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_agent
+```
 
 ### License
 

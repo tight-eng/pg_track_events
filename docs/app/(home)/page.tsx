@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import PgTrackEventsHero from './pg-track-events-hero';
 
 export default function HomePage() {
   return (
@@ -14,6 +15,8 @@ export default function HomePage() {
         </Link>{' '}
         and see the documentation.
       </p>
+
+      <PgTrackEventsHero />
     </main>
   );
 }

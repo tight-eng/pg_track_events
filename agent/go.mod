@@ -1,6 +1,6 @@
 module github.com/typeeng/pg_track_events/agent
 
-go 1.24.2
+go 1.24
 
 require (
 	cloud.google.com/go/bigquery v1.67.0
