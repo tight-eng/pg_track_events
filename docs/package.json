@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "next build",
     "copy-readme": "cp ../README.md content/docs/index.mdx && echo \"---\\ntitle: 'Introduction'\\ndescription: 'Emit analytics events as your data changes'\\n---\\n$(cat content/docs/index.mdx)\" > content/docs/index.mdx",
