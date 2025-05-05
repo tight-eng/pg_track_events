@@ -71,10 +71,16 @@ fi
 # Download URL
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
 
-# Create installation directory
-INSTALL_DIR="/usr/local/bin"
+# Determine installation directory
 if [ "$OS" = "windows" ]; then
     INSTALL_DIR="$HOME/.local/bin"
+else
+    # Try to use /usr/local/bin first, fall back to ~/.local/bin if no permission
+    if mkdir -p /usr/local/bin 2>/dev/null && [ -w /usr/local/bin ]; then
+        INSTALL_DIR="/usr/local/bin"
+    else
+        INSTALL_DIR="$HOME/.local/bin"
+    fi
 fi
 
 # Create directory if it doesn't exist
@@ -96,3 +102,10 @@ fi
 
 success "Successfully installed pg_track_events ${VERSION} to ${INSTALL_DIR}/pg_track_events"
 success "You can now run 'pg_track_events' from your terminal"
+
+# Add to PATH if not already there
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo "To use pg_track_events, add this to your ~/.bashrc or ~/.zshrc and restart shell:"
+    echo "export PATH=\"\$PATH:$INSTALL_DIR\""
+fi
+
