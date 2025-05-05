@@ -1,4 +1,9 @@
-import { SQL } from "bun";
+import { embeddedFiles, SQL } from "bun";
+
+type EmbeddedFile = {
+  name: string;
+  text(): Promise<string>;
+};
 
 type Column = {
   name: string;
@@ -49,8 +54,27 @@ type Table = {
 export type DatabaseSchema = Table[];
 
 export async function getIntrospectedSchema(sql: SQL): Promise<DatabaseSchema> {
+  let introspectPgSql: string;
 
-  const introspectPgSql = await Bun.file("wasm/introspect_pg.sql").text();
+  // @todo figure out why this is the only way to get it to load from embdeded files. 
+  // docs say it should work both ways, as long as we compile the asset into the binary
+  try {
+    // First try to get the SQL from the embedded files
+    const embeddedFile = (embeddedFiles as unknown as EmbeddedFile[]).find(i => i.name === 'introspect_pg.sql');
+    if (embeddedFile) {
+      introspectPgSql = await embeddedFile.text();
+    } else {
+      throw new Error('Embedded file not found');
+    }
+  } catch (error) {
+    try {
+      // Fallback to reading from the file system
+      introspectPgSql = await Bun.file(new URL("../wasm/introspect_pg.sql", import.meta.url)).text();
+    } catch (error) {
+      throw new Error('Failed to load introspection SQL from both embedded files and file system');
+    }
+  }
+
   const result = await sql.unsafe(introspectPgSql);
   return JSON.parse(result[0].schema_json);
 }
