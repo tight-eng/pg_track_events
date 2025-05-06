@@ -18,7 +18,7 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ### How it works
 
-[digram]
+![alt](docs/public/diagram.svg)
 
 ### Quick Start
 
