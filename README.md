@@ -2,7 +2,7 @@
 
 **Your database knows what happened — why aren’t you listening?**
 
-`pg_track_events` emits analytics events as your data changes. This repo has the tools you need to map row changes into analytics events, and then stream them to tools like PostHog, Mixpanel, Segment, and BigQuery. Every query you run tells you something about your app and users so stop throwing them away.
+`pg_track_events` emits analytics events as your data changes. This repo has the tools you need to map row changes into analytics events, and then stream them to tools like PostHog, Mixpanel, Segment, and BigQuery.
 
 ### Features
 
@@ -14,22 +14,61 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 🧠 **Semantic events, not raw logs** — transform DB changes into intelligible events with simple logic (Google CEL).
 
-⚡️ **Easy setup, then scalable** — start with Postgres triggers (1-3% slower writes[run benchmarks]), scale to WAL and replicas if needed.
+⚡️ **Easy setup, then scalable** — start with Postgres triggers ([1-3% slower writes - benchmarks](/benchmarks/README.md)), scale to WAL and replicas if needed.
 
 ### How it works
 
 ![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/diagram.svg)
 
+1. Use our CLI to add change triggers to selected Postgres tables (either directly or by dumping a `migration.sql` file)
+1. Define how these changes are transformed into analytics events in `pg_track_events.config.yaml`
+1. Run a Docker container that reads changes from an outbox table ('schema_pg_track_events.event_log`), processes them into analytics events, and forwards them to your desintations.
+
 ### Quick Start
+
+Install the CLI
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/install.sh | bash
 ```
 
-```bash
-# TODO Run the CLI init command
-# TODO cd into the directory with the newly-generated Dockerfile and pg_track_events.config.yaml
+Initialize in your backend
 
+```bash
+pg_track_events init
+```
+
+Add your own trackers and configure destinations in the `pg_track_events.config.yaml`file. [Full specification](/)
+
+```yaml
+track:
+  user.insert:
+    event: "user_signup"
+    properties:
+      id: "new.id"
+      email: "new.email"
+      name: "new.name"
+
+  user.update:
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    "user_changed_email":
+      id: "new.id"
+      previous_email: "old.email"
+      new_email: "new.email"
+
+destinations:
+  posthog:
+    filter: "*"
+    apiKey: "$POSTHOG_API_KEY"
+
+ignore:
+  auth_authenticator: "*" # This ignores the auth_authenticator table
+  user: ["hashed_password"] # This ignores the "hased_password" column
+```
+
+Deploy a worker to your infrastructure. The Docker container created by `init` command should be ready to build and deploy, but you can customize it if you need to.
+
+```bash
 # Build image
 docker build -t pg_track_events_agent .
 
@@ -37,6 +76,8 @@ docker build -t pg_track_events_agent .
 # The POSTHOG_API_KEY is just an example, you'll need to pass in whatever env vars you're referencing from your pg_track_events.config.yaml file
 docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_agent
 ```
+
+Watch the events flow!
 
 ### License
 
