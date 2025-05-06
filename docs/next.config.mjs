@@ -7,6 +7,13 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  images: {
+    remotePatterns: 
+    [
+      new URL('https://raw.githubusercontent.com/**/**'), 
+      new URL('https://github.com/**/**')
+    ],
+  },
 };
 
 if (process.env.NODE_ENV === 'development') {

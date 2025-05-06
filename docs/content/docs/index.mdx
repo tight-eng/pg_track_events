@@ -27,6 +27,8 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ### Quick Start
 
+#### Add Triggers
+
 Install the CLI
 
 ```bash
@@ -38,6 +40,25 @@ Initialize in your backend
 ```bash
 pg_track_events init
 ```
+
+Select tables you wish to track
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/table-choices-with-selections.jpg?raw=true)
+
+Preview the planned queries
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/planned-queries.jpg?raw=true)
+
+> All tables, functions and triggers are added to the `schema_pg_track_events` schema. You can uninstall everything related by running
+> `pg_track_events drop`
+> or by running
+> `DROP SCHEMA schema_pg_track_events CASCADE`
+
+Choose to either
+
+(1) `y/yes` Apply changes directly to the database you have connected to.
+
+(2) `o/out` Output a migration file to review / test out / apply the changes yourself.
+
+### Configure Tracked Events
 
 Add your own trackers and configure destinations in the `pg_track_events.config.yaml`file. [Full specification](/)
 
@@ -66,6 +87,8 @@ ignore:
   auth_authenticator: "*" # This ignores the auth_authenticator table
   user: ["hashed_password"] # This ignores the "hased_password" column
 ```
+
+#### Deploy a worker
 
 Deploy a worker to your infrastructure. The Docker container created by `init` command should be ready to build and deploy, but you can customize it if you need to.
 
