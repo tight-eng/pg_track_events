@@ -55,6 +55,7 @@ export async function generateMetadata({
 
   const image = ['/docs-og', ...slug, 'image.png'].join('/');
   return {
+    metadataBase: new URL('https://tight.sh'),
     title: page.data.title,
     description: page.data.description,
     openGraph: {
