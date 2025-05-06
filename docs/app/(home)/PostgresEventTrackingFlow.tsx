@@ -235,18 +235,19 @@ const AmplitudeIcon = () => (
   </svg>
 );
 
-const dbCode = `INSERT INTO users
+const dbCode = (<div dangerouslySetInnerHTML={{__html: `<pre style="font-family:monospace;color: rgb(248, 248, 242); font-weight: 400; "><span style="color: rgb(255, 160, 122); font-weight: 400;">INSERT</span> <span style="color: rgb(255, 160, 122); font-weight: 400;">INTO</span> users
 {
-  "name": "Tim Cook",
-  "email": "tim@example.com"
-}`
-const transformationCode = `track:
-  user.insert:
-    event: "user_signup"
-    properties:
-      id: "new.id"
-      email: "new.email"
-      name: "new.name"`
+  <span style="color: rgb(171, 227, 56); font-weight: 400;">"name"</span>: <span style="color: rgb(171, 227, 56); font-weight: 400;">"Tim Cook"</span>,
+  <span style="color: rgb(171, 227, 56); font-weight: 400;">"email"</span>: <span style="color: rgb(171, 227, 56); font-weight: 400;">"tim@apple.com"</span>
+}</pre>`}}></div>)
+const transformationCode = (<div dangerouslySetInnerHTML={{
+  __html: `<pre style="font-family:monospace;color: rgb(248, 248, 242); font-weight: 400; "><span style="color: rgb(248, 248, 242); font-weight: 400;">track:</span>
+  <span style="color: rgb(248, 248, 242); font-weight: 400;">user.insert:</span>
+    <span style="color: rgb(248, 248, 242); font-weight: 400;">event:</span> <span style="color: rgb(171, 227, 56); font-weight: 400;">"user_signup"</span>
+    <span style="color: rgb(248, 248, 242); font-weight: 400;">properties:</span>
+      <span style="color: rgb(248, 248, 242); font-weight: 400;">id:</span> <span style="color: rgb(171, 227, 56); font-weight: 400;">"new.id"</span>
+      <span style="color: rgb(248, 248, 242); font-weight: 400;">email:</span> <span style="color: rgb(171, 227, 56); font-weight: 400;">"new.email"</span>
+      <span style="color: rgb(248, 248, 242); font-weight: 400;">name:</span> <span style="color: rgb(171, 227, 56); font-weight: 400;">"new.name"</span></pre>`}}></div>)
 
 // Custom node components
 const DatabaseNode = ({ data }: { data: { label: string, code: string } }) => {
@@ -260,9 +261,7 @@ const DatabaseNode = ({ data }: { data: { label: string, code: string } }) => {
       </div>
       <div className="border border-gray-700 rounded-md p-3 bg-gray-900">
         <div className="text-white font-mono text-sm text-left">
-          <pre>
-            {data.code}
-          </pre>
+          {data.code}
         </div>
       </div>
       <Handle type="source" position={Position.Right} id="a" className="w-3 h-3 bg-emerald-500" />
@@ -281,9 +280,7 @@ const TransformationNode = ({ data }: { data: { label: string, code: string } })
       </div>
       <div className="border border-gray-700 rounded-md p-3 bg-gray-900">
         <div className="text-white font-mono text-sm text-left">
-          <pre>
-            {data.code}
-          </pre>
+          {data.code}
         </div>
       </div>
       <Handle type="target" position={Position.Left} id="b" className="w-3 h-3 bg-emerald-500" />
