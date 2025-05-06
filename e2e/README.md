@@ -8,7 +8,7 @@ Each test scenario is defined in its own subdirectory under `scenarios/`. A scen
 
 1. `schema.sql` - Defines the database schema for the test
 2. `pg_track_events.config.yaml` - Configuration for the analytics agent
-3. `db_events.jsonl` - A sequence of database events to simulate
+3. `db_events.ndjson` - A sequence of database events to simulate
 
 ## Running Tests
 
@@ -35,7 +35,7 @@ To create a new test scenario:
 2. Add the three required files:
    - `schema.sql` - Your test database schema
    - `pg_track_events.config.yaml` - Agent configuration
-   - `db_events.jsonl` - Test events
+   - `db_events.ndjson` - Test events
 
 ## Example Scenario
 

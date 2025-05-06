@@ -83,7 +83,7 @@ func findScenarios(baseDir string) ([]Scenario, error) {
 		// Check if this directory contains a scenario
 		schemaPath := filepath.Join(path, "schema.sql")
 		configPath := filepath.Join(path, "pg_track_events.config.yaml")
-		eventsPath := filepath.Join(path, "db_events.jsonl")
+		eventsPath := filepath.Join(path, "db_events.ndjson")
 
 		if _, err := os.Stat(schemaPath); err != nil {
 			return nil

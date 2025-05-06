@@ -238,7 +238,7 @@ func (m *S3Manager) GetOrCreateBuffer(key string, dirPath string) *S3Buffer {
 
 	// Create a new buffer
 	now := time.Now().UTC()
-	s3Key := path.Join(m.rootDir, dirPath, fmt.Sprintf("%s-%s.jsonl", now.Format(m.consts.FileTimestampFormat), m.agentID))
+	s3Key := path.Join(m.rootDir, dirPath, fmt.Sprintf("%s-%s.ndjson", now.Format(m.consts.FileTimestampFormat), m.agentID))
 
 	buf := bytes.NewBuffer(nil)
 	writer := bufio.NewWriter(buf)

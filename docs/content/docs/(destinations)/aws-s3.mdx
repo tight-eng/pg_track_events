@@ -10,7 +10,7 @@ AWS S3 (Simple Storage Service) is a highly scalable object storage service. pg_
 1. **Processed Events** - Transformed analytics events with defined event names and properties
 2. **Raw DB Events** - Raw database change events showing the exact changes made to your database
 
-Events are stored in JSONL (JSON Lines) format, with each line representing a single event.
+Events are stored in ndjson (newline-delimited JSON) format, with each line representing a single event.
 
 ## Processed Events Destination
 
@@ -43,9 +43,9 @@ destinations:
 
 ### Data Format and Storage
 
-Processed events are stored in JSONL format with each line containing a single event. Files are organized by event name, with events for each type stored in separate files.
+Processed events are stored in ndjson format with each line containing a single event. Files are organized by event name, with events for each type stored in separate files.
 
-The files are named using the pattern: `{timestamp}-{agentID}.jsonl`, where:
+The files are named using the pattern: `{timestamp}-{agentID}.ndjson`, where:
 - `timestamp` is in the format "YYYYMMDDTHHMMSSZ" (UTC)
 - `agentID` is a unique identifier for the pg_track_events agent instance
 
@@ -82,9 +82,9 @@ raw_db_event_destinations:
 
 ### Data Format and Storage
 
-Raw DB events are stored in JSONL format with each line containing a single event. Files are organized by table name, with events for each table stored in separate files.
+Raw DB events are stored in ndjson format with each line containing a single event. Files are organized by table name, with events for each table stored in separate files.
 
-The files are named using the pattern: `{timestamp}-{agentID}.jsonl`, where:
+The files are named using the pattern: `{timestamp}-{agentID}.ndjson`, where:
 - `timestamp` is in the format "YYYYMMDDTHHMMSSZ" (UTC)
 - `agentID` is a unique identifier for the pg_track_events agent instance
 
