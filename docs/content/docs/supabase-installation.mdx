@@ -1,4 +1,94 @@
 ---
 title: Supabase Installation
-description: TODO
+description: Set up pg_track_events to work with Supabase
 ---
+
+import Image from 'next/image'
+import supabaseImg from '../../public/supabase.jpg'
+import sessionPoolerImg from '../../public/session-pooler.jpg'
+
+## Supabase Installation
+We recommend setting up pg_track_events inside a backend repository, where you already have a Supabase project connected. 
+
+If you do not have one alreayd, add an `.env.local` file to your project with a `DATABASE_URL` variable. As we'll be modifying the database, you will want to use a connection string that authenticated the `postgres` user Supabase creates. 
+
+```bash
+DATABASE_URL="postgres://**************************"
+```
+
+You can find your connection string by clicking "Connect" in the top of the UI. 
+
+<Image src={supabaseImg} alt="Supabase connection string location" />
+
+After you click "Connect", you'll be able to copy the connection string. Make sure to choose the "Session Pooler" option (the 3rd one): 
+
+<Image src={sessionPoolerImg} alt="Supabase pooler configuration" />
+
+```
+
+### Setup pg_track_events
+
+Install the CLI:
+
+```bash
+curl -sSL https://tight.sh/install | bash
+```
+
+Initialize in your backend
+
+```bash
+pg_track_events init
+```
+
+Select tables you wish to track
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/table-choices-with-selections.jpg?raw=true)
+
+The CLI will output the triggers, functions and tables it plans to add.
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/planned-queries.jpg?raw=true)
+
+
+### Configure Tracked Events
+
+Add your own trackers and configure destinations in the `pg_track_events.config.yaml`file. 
+[Full instructions here](https://tight.sh/docs/defining-events)
+
+```yaml
+track:
+  user.insert:
+    event: "user_signup"
+    properties:
+      id: "new.id"
+      email: "new.email"
+      name: "new.name"
+
+  user.update:
+    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
+    "user_changed_email":
+      id: "new.id"
+      previous_email: "old.email"
+      new_email: "new.email"
+
+destinations:
+  posthog:
+    filter: "*"
+    apiKey: "$POSTHOG_API_KEY"
+
+ignore:
+  auth_authenticator: "*" # This ignores the auth_authenticator table
+  user: ["hashed_password"] # This ignores the "hased_password" column
+```
+
+### Deploy a worker
+
+Deploy a worker to your infrastructure. The Docker container created by `init` command should be ready to build and deploy, but you can customize it if you need to. [Full docs here](https://tight.sh/docs/deploying-worker)
+
+```bash
+# Build image
+docker build -t pg_track_events_agent .
+
+# Run image (interactive mode, for testing)
+# The POSTHOG_API_KEY is just an example, you'll need to pass in whatever env vars you're referencing from your pg_track_events.config.yaml file
+docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_agent
+```
+
+Watch the events flow!

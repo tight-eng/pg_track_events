@@ -17,7 +17,6 @@
         "(destinations)/google-bigquery",
         "(destinations)/aws-s3",
         "---Guides---",
-        "quickstart",
         "supabase-installation"
     ]
 }
