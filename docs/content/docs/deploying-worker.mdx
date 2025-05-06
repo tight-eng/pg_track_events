@@ -1,6 +1,41 @@
 ---
 title: Deploying Worker
-description: TODO
+description: Things to know before deploying an Analytics Worker
 ---
 
-HELLO WORLD
+Once you add `pg_track_events` triggers to your Postgres instance it will begin storing row changes in an outbox table called `schema_pg_track_events.event_log`. A worker will then pick up these row changes, transform them into analytics events, send them to your destinations, before deleting them from the log. 
+
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/diagram.svg)
+
+These workers are easy to deploy and run on any infrastructure that supports Docker. Using `pg_track_events init` creates a simple Dockerfile that pulls the image and copies in your `pg_track_events.config.yaml` file. The base image is published to GitHub Container Registry: https://github.com/tight-eng/pg_track_events/pkgs/container/pg_track_events%2Fagent
+
+
+```dockerfile
+FROM --platform=linux/amd64 ghcr.io/tight-eng/pg_track_events/agent:latest
+
+COPY pg_track_events.config.yaml .
+```
+
+You can build and run the image locally to test it out.
+
+```bash
+# Build image
+docker build -t pg_track_events_agent .
+
+# Run image (interactive mode, for testing)
+# The POSTHOG_API_KEY is just an example, you'll need to pass in whatever env vars you're referencing from your pg_track_events.config.yaml file
+docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_agent
+```
+
+### Important things to know
+
+- The container will fail to start if you do not provide a `DATABASE_URL`, and the API keys for the destinations you set up. 
+- You handle the networking. The container assumes it can reach the Postgres instance and the destinations.
+- Adding a new destination, won’t trigger a backfill. 
+- You probably only need one worker, but having more than one running won’t break anything or lead to duplicate events. 
+- Downtime redeploying the container won’t cause any events to be missed. They remain in the outbox until processed. 
+- If destination is down the data won’t get there. Today we don't have a retry mechanism to ensure delivery. 
+
+
+### Need something more scalable?
+We're working on a worker that can stream off the WAL. It doesn't require the outbok table, will be more performant, and more reliable. If you'd like to contribute or share your use case please add a comment to [this issue](https://github.com/tight-eng/pg_track_events/issues/1).
