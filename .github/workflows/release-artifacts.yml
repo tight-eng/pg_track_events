@@ -29,13 +29,14 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
         run: |
           cd agent
           EXTENSION=""
           if [ "${{ matrix.goos }}" = "windows" ]; then
             EXTENSION=".exe"
           fi
-          go build -ldflags="-linkmode external -extldflags '-static'" -o "pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
+          go build -o "pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
 
       - name: Upload binary to artifacts
         uses: actions/upload-artifact@v4
