@@ -458,6 +458,24 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Filter:      destination.Filter,
 				Destination: bq,
 			})
+		case "s3":
+			s3, err := destinations.NewS3Destination(
+				destination.Bucket,
+				destination.Endpoint,
+				destination.Region,
+				destination.RootDir,
+				destination.AccessKey,
+				destination.SecretKey,
+				logger,
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create s3 destination: %w", err)
+			}
+			initializedDestinations = append(initializedDestinations, InitializedProcessedEventDestination{
+				Kind:        kind,
+				Filter:      destination.Filter,
+				Destination: s3,
+			})
 		default:
 			return nil, nil, fmt.Errorf("unknown destination type: %s", kind)
 		}

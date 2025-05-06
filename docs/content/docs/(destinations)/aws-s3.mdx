@@ -1,6 +1,161 @@
 ---
 title: "AWS S3"
-description: "TODO"
+description: "Send tracked database events to AWS S3 or S3-compatible storage for analytics and data warehousing"
 ---
 
-TODO
+## Overview
+
+AWS S3 (Simple Storage Service) is a highly scalable object storage service. pg_track_events supports sending data to S3 or any S3-compatible storage service (such as Cloudflare R2, MinIO, etc.) in two formats:
+
+1. **Processed Events** - Transformed analytics events with defined event names and properties
+2. **Raw DB Events** - Raw database change events showing the exact changes made to your database
+
+Events are stored in JSONL (JSON Lines) format, with each line representing a single event.
+
+## Processed Events Destination
+
+This destination sends your transformed analytics events to S3 for analysis and reporting.
+
+### Configuration
+
+To configure S3 as a destination for your processed events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+destinations:
+  s3:
+    bucket: "your-bucket-name" # Required
+    region: "us-east-1" # Required
+    accessKey: "YOUR_ACCESS_KEY" # Required
+    secretKey: "YOUR_SECRET_KEY" # Required
+    rootDir: "processed-events" # Optional
+    endpoint: "https://your-custom-endpoint" # Optional, for S3-compatible services
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `bucket`: Your S3 bucket name (required)
+- `region`: AWS region where your bucket is located (required)
+- `accessKey`: Your AWS access key ID (required)
+- `secretKey`: Your AWS secret access key (required)
+- `rootDir`: Base directory path within the bucket where events will be stored (optional)
+- `endpoint`: Custom endpoint URL for S3-compatible services (optional)
+
+### Data Format and Storage
+
+Processed events are stored in JSONL format with each line containing a single event. Files are organized by event name, with events for each type stored in separate files.
+
+The files are named using the pattern: `{timestamp}-{agentID}.jsonl`, where:
+- `timestamp` is in the format "YYYYMMDDTHHMMSSZ" (UTC)
+- `agentID` is a unique identifier for the pg_track_events agent instance
+
+Files are automatically rotated after reaching a maximum size or event count to ensure efficient processing.
+
+## Raw DB Events Destination
+
+This destination sends raw database change events to S3, allowing you to see exactly what changed in your database.
+
+### Configuration
+
+To configure S3 as a destination for your raw DB events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+raw_db_event_destinations:
+  s3:
+    bucket: "your-bucket-name" # Required
+    region: "us-east-1" # Required
+    accessKey: "YOUR_ACCESS_KEY" # Required
+    secretKey: "YOUR_SECRET_KEY" # Required
+    rootDir: "raw-db-events" # Optional
+    endpoint: "https://your-custom-endpoint" # Optional, for S3-compatible services
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `bucket`: Your S3 bucket name (required)
+- `region`: AWS region where your bucket is located (required)
+- `accessKey`: Your AWS access key ID (required)
+- `secretKey`: Your AWS secret access key (required)
+- `rootDir`: Base directory path within the bucket where events will be stored (optional)
+- `endpoint`: Custom endpoint URL for S3-compatible services (optional)
+
+### Data Format and Storage
+
+Raw DB events are stored in JSONL format with each line containing a single event. Files are organized by table name, with events for each table stored in separate files.
+
+The files are named using the pattern: `{timestamp}-{agentID}.jsonl`, where:
+- `timestamp` is in the format "YYYYMMDDTHHMMSSZ" (UTC)
+- `agentID` is a unique identifier for the pg_track_events agent instance
+
+Files are automatically rotated after reaching a maximum size or event count to ensure efficient processing.
+
+## Setting Up AWS S3
+
+### Creating an IAM User
+
+1. Go to the [AWS IAM Console](https://console.aws.amazon.com/iam/)
+2. Navigate to "Users" and click "Add user"
+3. Give the user a name and select "Programmatic access"
+4. Attach policies directly or create a custom policy with the following permissions:
+   - `s3:PutObject`
+   - `s3:GetObject`
+   - `s3:ListBucket`
+   - `s3:DeleteObject` (if needed)
+
+### Creating a Bucket
+
+1. Go to the [S3 Console](https://console.aws.amazon.com/s3/)
+2. Click "Create bucket"
+3. Choose a globally unique bucket name and select your preferred region
+4. Configure bucket settings according to your needs
+5. Complete the bucket creation process
+
+## Using S3-Compatible Services
+
+pg_track_events is compatible with any storage service that implements the S3 API:
+
+### Cloudflare R2
+
+To use Cloudflare R2, set the `endpoint` to your R2 endpoint URL:
+
+```yaml
+destinations:
+  s3:
+    bucket: "your-r2-bucket"
+    region: "auto" # R2 doesn't use regions, but this field is required
+    accessKey: "YOUR_R2_ACCESS_KEY"
+    secretKey: "YOUR_R2_SECRET_KEY"
+    endpoint: "https://{account_id}.r2.cloudflarestorage.com"
+```
+
+### MinIO
+
+For MinIO:
+
+```yaml
+destinations:
+  s3:
+    bucket: "your-minio-bucket"
+    region: "us-east-1" # Set this to match your MinIO configuration
+    accessKey: "YOUR_MINIO_ACCESS_KEY"
+    secretKey: "YOUR_MINIO_SECRET_KEY"
+    endpoint: "http://your-minio-server:9000"
+```
+
+## Environment Variables
+
+For security, you can use environment variables for sensitive information:
+
+```yaml
+destinations:
+  s3:
+    bucket: "$S3_BUCKET_NAME"
+    region: "$AWS_REGION"
+    accessKey: "$AWS_ACCESS_KEY_ID"
+    secretKey: "$AWS_SECRET_ACCESS_KEY"
+```
+
+## Note
+
+After making configuration changes, restart the pg_track_events agent for them to take effect.

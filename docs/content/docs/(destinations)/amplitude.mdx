@@ -1,6 +1,51 @@
 ---
 title: "Amplitude"
-description: "TODO"
+description: "Send tracked database events to Amplitude for analytics"
 ---
 
-TODO
+## Configuration
+
+To configure Amplitude as a destination for your tracked events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+destinations:
+  amplitude:
+    apiKey: "YOUR_API_KEY_HERE" # or use an environment variable (see below)
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `apiKey`: Your Amplitude API key (required). Can be hardcoded directly in the YAML or [reference an environment variable](/docs/destinations#referencing-environment-variables).
+- `endpoint`: (optional) Custom API endpoint URL for Amplitude. Defaults to `https://api2.amplitude.com`.
+
+## Getting Your Amplitude API Key
+
+To find your API key:
+
+1. Log in to your Amplitude account
+2. Go to Settings > Projects
+3. Select the project you want to use
+4. Copy your API Key from the project settings
+
+## User IDs (Distinct IDs)
+
+The system automatically extracts a user ID from your event properties in the following order:
+
+1. `distinct_id` property
+2. Common user ID fields (`user_id`, `userid`, `_user_id`)
+3. For tables named `users`, `user`, or `_users`, it will look for an `id` field
+
+If no ID is found, the user ID will be `null`. Note that while other APIs and pg_track_events may refer to this ID as Distinct ID, in Amplitude, this identifier is known as `user_id`.
+
+## Event Format
+
+Events sent to Amplitude include:
+- User ID (from the distinct ID)
+- Event type (from your configured event name)
+- Timestamp (in milliseconds)
+- Event properties (from your configured properties)
+
+## Note
+
+After making configuration changes, restart the pg_track_events agent for them to take effect.

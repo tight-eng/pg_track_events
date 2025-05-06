@@ -1,6 +1,185 @@
 ---
 title: "Google BigQuery"
-description: "TODO"
+description: "Send tracked database events to Google BigQuery for analytics and data warehousing"
 ---
 
-TODO
+## Overview
+
+Google BigQuery is a serverless, highly scalable, and cost-effective cloud data warehouse. pg_track_events supports sending data to BigQuery in two formats:
+
+1. **Processed Events** - Transformed analytics events with defined event names and properties
+2. **Raw DB Events** - Raw database change events showing the exact changes made to your database
+
+## Processed Events Destination
+
+This destination sends your transformed analytics events to BigQuery for analysis and reporting.
+
+### Configuration
+
+To configure BigQuery as a destination for your processed events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+destinations:
+  bigquery:
+    tableId: "your-project-id.your_dataset.your_table" # Required
+    credentialsJson: "YOUR_SERVICE_ACCOUNT_JSON" # Required, or use an environment variable
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `tableId`: Your BigQuery table ID in format `project_id.dataset_id.table_name` (required)
+- `credentialsJson`: Your Google Cloud service account credentials JSON (required). Can be hardcoded directly in the YAML or [reference an environment variable](/docs/destinations#referencing-environment-variables).
+
+### Table Structure
+
+Your BigQuery table should have the following schema:
+
+```json
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Unique ID of the event record"
+    },
+    {
+        "name": "name",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Name of the event, for example, user_signed_up"
+    },
+    {
+        "name": "properties",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "event properties"
+    },
+    {
+        "name": "user_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "User id (aka distinct id) "
+    },
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp that represents when the event was observed"
+    },
+    {
+        "name": "processed_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp of when the event was processed into bigquery"
+    }
+]
+```
+
+## Raw DB Events Destination
+
+This destination sends raw database change events to BigQuery, allowing you to see exactly what changed in your database.
+
+### Configuration
+
+To configure BigQuery as a destination for your raw DB events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+raw_db_event_destinations:
+  bigquery:
+    tableId: "your-project-id.your_dataset.your_raw_events_table" # Required
+    credentialsJson: "YOUR_SERVICE_ACCOUNT_JSON" # Required, or use an environment variable
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `tableId`: Your BigQuery table ID in format `project_id.dataset_id.table_name` (required)
+- `credentialsJson`: Your Google Cloud service account credentials JSON (required). Can be hardcoded directly in the YAML or [reference an environment variable](/docs/destinations#referencing-environment-variables).
+
+### Table Structure
+
+Your BigQuery table for raw DB events should have the following schema:
+
+```json
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Unique ID of the event record"
+    },
+    {
+        "name": "event_type",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Type of operation: insert, update, delete"
+    },
+    {
+        "name": "row_table_name",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Name of the table the event occurred on"
+    },
+    {
+        "name": "old_row",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "Old row data"
+    },
+    {
+        "name": "new_row",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "New row data"
+    },
+    {
+        "name": "logged_at",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp that represents when the event was observed"
+    }
+]
+```
+
+## Setting Up Google BigQuery
+
+### Creating a Service Account
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your project
+3. Navigate to "IAM & Admin" > "Service Accounts"
+4. Click "Create Service Account"
+5. Give it a name and description
+6. Assign the "BigQuery Data Editor" role
+7. Create a JSON key and download it
+8. Store this key securely and use it for the `credentialsJson` configuration
+
+### Creating a Dataset and Table
+
+1. In the Google Cloud Console, navigate to BigQuery
+2. Create a new dataset in your preferred [location](https://cloud.google.com/bigquery/docs/locations)
+3. Create a table with the schema defined above
+4. Note the project ID, dataset ID, and table name to form your `tableId`
+
+## Locations and Regions
+
+Google BigQuery is available in [multiple regions worldwide](https://cloud.google.com/bigquery/docs/locations). When creating your dataset, consider:
+
+- Data residency requirements
+- Colocating your BigQuery dataset with other Google Cloud resources
+- Regional pricing differences
+
+## User ID (Distinct ID)
+
+For processed events, the system automatically extracts a distinct ID from your event properties in the following order:
+
+1. `distinct_id` property
+2. Common user ID fields (`user_id`, `userid`, `_user_id`)
+3. For tables named `users`, `user`, or `_users`, it will look for an `id` field
+
+If no ID is found, the user ID will be `null`. Note that while other integrations may refer to this ID as Distinct ID, in BigQuery, this identifier is stored in the `user_id` field.
+
+## Note
+
+After making configuration changes, restart the pg_track_events agent for them to take effect.
