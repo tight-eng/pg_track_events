@@ -1,8 +1,8 @@
-import PostgresEventTrackingFlow from './PostgresEventTrackingFlow';
+import PostgresEventTrackingFlow from '@/components/home/PostgresEventTrackingFlow';
 
 export default function HomePage() {
   return (
-    <main className="">
+    <main>
       <PostgresEventTrackingFlow />
     </main>
   );
