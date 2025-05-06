@@ -1,6 +1,33 @@
 ---
 title: Ignore Tables and Columns
-description: TODO
+description: Choose which tables and columns to track
 ---
 
-HELLO WORLD
+Changes to specific tables or columns can be ignored by including them in the `ignore` section of the `pg_track_events.config.yaml` file.
+
+- A `*` will ignore the entire table
+- An array of specific columns will ignore only those columns. 
+
+```yaml
+track: 
+    ...
+destinations:
+    ...
+ignore:
+  sessions: *
+  orders: ['address', 'city', 'state']
+```
+
+## Migrating the triggers 
+Changes to the ignored tables or columns will not be reflected in the database until the triggers are updated. The `apply-triggers` command will stage a migration to update the triggers, and help you apply it directly to the connected database if you choose. 
+```bash
+`pg_track_events apply-triggers
+```
+
+## FAQ: New tables are not being tracked
+
+If you've recently added a new table to your database, are not recieving any events from it, and don't see it in the list of ignored tables -- just run `apply-triggers`. You'll be prompted to start tracking new tables, and apply a migration including new triggers to your database. 
+
+```bash
+`pg_track_events apply-triggers
+```
