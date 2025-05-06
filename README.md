@@ -18,7 +18,7 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 ### How it works
 
-![alt](docs/public/diagram.svg)
+![alt](https://raw.githubusercontent.com/tight-eng/pg_track_events/refs/heads/main/docs/public/diagram.svg)
 
 ### Quick Start
 
