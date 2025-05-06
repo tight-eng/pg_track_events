@@ -4,21 +4,20 @@
     "icon": "Building2",
     "root": true,
     "pages": [
-        "---Introduction---",
-        "index",
-        "what-is-pg_track_events",
-        "comparisons",
         "---Setup---",
-        "quickstart",
-        "supabase-installation",
-        "---Usage---",
-        "events-overview",
+        "index",
+        "defining-events",
+        "deploying-worker",
+        "ignore",
         "---Destinations---",
         "(destinations)/destinations",
         "(destinations)/mixpanel",
         "(destinations)/posthog",
         "(destinations)/amplitude",
         "(destinations)/google-bigquery",
-        "(destinations)/aws-s3"
+        "(destinations)/aws-s3",
+        "---Guides---",
+        "quickstart",
+        "supabase-installation"
     ]
 }

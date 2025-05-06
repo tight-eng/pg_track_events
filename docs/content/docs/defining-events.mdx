@@ -1,0 +1,80 @@
+---
+title: Defining Events
+description: Learn how to define analytic events from your database
+---
+
+`pg_track_events` captures changes to rows in your database (ie inserts, updates, deletes) and emits analytics events. Before being sent to your analytics destination, raw changes are transformed into semantic events based on the logic defined in the `pg_track_events.config.yaml` file.
+
+Examples: 
+- `inserted user` -> `USER_SIGNUP {email}`
+- `updated invitation.status from 'pending' to 'accepted'` -> `USER_JOINED_TEAM {teamId, userId}`
+- `deleted active_subscription` -> `TEAM_CANCELED_SUBSCRIPTION {teamId}`
+
+## Simple Events
+
+The `track` section of the `pg_track_events.config.yaml` is how you define transformations from database changes to analytics events. 
+
+Its keys follow the format `{tableName}.{insert|update|delete}`
+
+```yaml
+track: 
+  # Will run every time a user is inserted
+  users.insert: 
+    event: USER_SIGNUP
+    properties: 
+      email: new.email
+      id: new.id  
+```
+
+Provide a semantic `event` name for use in your analytics tool, and the `properties` you want to track. These `properties` are columns from the table and can be referenced using dot notation. 
+
+- `insert` events will have `new` keyword to reference the new row's values. 
+
+- `update` events will have `new` and `old` keywords to reference the new and old row's values. 
+
+- `delete` events will have `old` keyword to reference the deleted row's values. 
+
+
+| Note: for most simple cases you will only need to use dot notation, but under the hood each of the `properties` statements are [CEL](https://github.com/google/cel-spec) expressions, supporting more complex transformations in the future. 
+
+
+## Conditional Events
+
+It is possible to emit different events based on the specific data inserted or updated. 
+
+This is done by putting logic in the `cond` field that returns the name of the event that should be emitted. The worker will first check the condition and then emit an event with the defined properties. 
+
+```yaml
+track: 
+  # Will run every time a user is updated
+  invitation.update: 
+    # Emits USER_JOINED_TEAM when accepted and USER_REJECTED_INVITATION when it is rejected
+    cond: old.status == "pending" && new.status == "accepted" ? "USER_JOINED_TEAM" : old.status == "pending" && new.status == "rejected" ? "USER_REJECTED_INVITATION" : null
+    # Both events can have different properties
+    USER_JOINED_TEAM:
+      userId: new.user_id
+      teamId: new.team_id
+    USER_REJECTED_INVITATION:
+      teamId: new.team_id
+```
+
+| Note: the `cond` expressions support the logic operations `==`, `!=`, `&&`, and `||`. Read more about [logic statements in the CEL language here](https://github.com/google/cel-spec/blob/master/doc/langdef.md#logical-operators). 
+
+
+
+## Validating
+
+The `pg_track_events validate` commands validates the event transformations are valid and reference real tables and columns. Run it as you are defining and updating events. 
+
+```bash
+pg_track_events validate
+```
+
+**Pro Tips:** 
+- If the CLI keeps asking you for a `DATABASE_URL` try using a local `.env` file or put it in your shell environment. The CLI will first try reading from there before asking. 
+- You can pass in the path to your config file, if you have moved it to a different location `pg_track_events validate /path/to/pg_track_events.config.yaml`
+- You should keep the `pg_track_events.config.yaml` file the same repo where you define your schema and migrations. 
+
+
+
+

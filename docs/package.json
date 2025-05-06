@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "next build",
-    "copy-readme": "cp ../README.md content/docs/index.mdx && echo \"---\\ntitle: 'pg_track_events'\\n---\\n$(tail -n +3 content/docs/index.mdx)\" > content/docs/index.mdx",
+    "copy-readme": "cp ../README.md content/docs/index.mdx && echo \"---\\ntitle: 'Quick Start'\\n---\\n$(tail -n +3 content/docs/index.mdx)\" > content/docs/index.mdx",
     "dev": "npm run copy-readme && next dev --turbo",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
