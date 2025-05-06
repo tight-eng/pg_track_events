@@ -10,6 +10,12 @@ export default function Layout({ children }: { children: ReactNode }) {
       active: 'nested-url',
       on: 'nav',
     },
+    {
+      text: 'GitHub',
+      url: 'https://github.com/tight-eng/pg_track_events',
+      active: 'nested-url',
+      on: 'nav',
+    },
   ]} {...baseOptions}>{children}</HomeLayout>;
 }
 
