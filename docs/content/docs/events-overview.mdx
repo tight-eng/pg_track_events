@@ -1,0 +1,39 @@
+---
+title: 'Event Transformations'
+description: 'TODO'
+---
+
+## Event Types
+
+pg_track_events works with two types of events:
+
+### Raw DB Events
+
+Raw DB Events are the low-level database change records captured directly from your database. These events contain:
+
+- Event type: `insert`, `update`, or `delete`
+- Table name that changed
+- Timestamp when the event was logged
+- Complete JSON representation of the old row (for updates and deletes)
+- Complete JSON representation of the new row (for inserts and updates)
+
+Raw DB Events are useful for:
+- Data warehousing and audit logs
+- Building data pipelines that need the complete raw data
+- Detailed forensic analysis of database changes
+
+### Processed Events
+
+Processed Events are semantic, application-level events that have been transformed from Raw DB Events using your configuration rules. These events contain:
+
+- Event name (e.g., "user_signup", "order_created")
+- Customized properties extracted from the database change
+- Timestamp
+- Optional distinct ID for user identification
+
+Processed Events are useful for:
+- Analytics platforms that expect semantic events
+- Tracking user behavior and business metrics
+- Creating understandable, actionable insights
+
+Most analytics destinations (like Mixpanel, PostHog, and Amplitude) only accept Processed Events, while data warehouse destinations (BigQuery, S3) can handle both types.

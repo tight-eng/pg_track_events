@@ -1,0 +1,55 @@
+---
+title: "Overview"
+description: "pg_track_events event destinations"
+---
+
+## Supported Destinations
+
+| Destination | Processed Events | Raw DB Events |
+|------------|-----------------|---------------|
+| [Mixpanel](/docs/mixpanel) | ✅ | ❌ |
+| [PostHog](/docs/posthog) | ✅ | ❌ |
+| [Amplitude](/docs/amplitude) | ✅ | ❌ |
+| [Google BigQuery](/docs/google-bigquery) | ✅ | ✅ |
+| [AWS S3](/docs/aws-s3) | ✅ | ✅ |
+
+## Configuration
+
+### Referencing environment variables
+
+To reference an environment variable for secrets, use the `$NAME_OF_VAR` syntax.
+
+For example, to set the Mixpanel project token via an environment variable called `MIXPANEL_PROJECT_TOKEN`, you would use the `$` syntax below:
+
+```yaml
+destinations:
+  mixpanel:
+    projectToken: "$MIXPANEL_PROJECT_TOKEN"
+```
+
+### Destination event name filters
+
+The `filter` property allows you to control which events are sent to each destination by matching against event names using glob patterns.
+
+```yaml
+destinations:
+  mixpanel:
+    filter: "*"          # Send all events to this destination
+    projectToken: "$MIXPANEL_PROJECT_TOKEN"
+  
+  posthog:
+    filter: "user_*"     # Send only events starting with "user_"
+    apiKey: "$POSTHOG_API_KEY"
+  
+  amplitude:
+    filter: "purchase_*" # Send only events starting with "purchase_"
+    apiKey: "$AMPLITUDE_API_KEY"
+```
+
+Common glob patterns:
+- `*` - Match all events
+- `user_*` - Match events starting with "user_"
+- `*_completed` - Match events ending with "_completed"
+- `*payment*` - Match events containing "payment" anywhere in the name
+
+

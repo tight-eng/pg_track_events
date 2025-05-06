@@ -26,11 +26,7 @@ func NewAmplitudeDestination(apiKey string, endpoint string, logger *slog.Logger
 	if apiKey == "" {
 		return nil, fmt.Errorf("API key is required")
 	}
-	if endpoint == "" {
-		endpoint = "https://api2.amplitude.com"
-	} else {
-		endpoint = strings.TrimSuffix(endpoint, "/")
-	}
+	endpoint = strings.TrimSuffix(endpoint, "/")
 
 	return &AmplitudeDestination{
 		apiKey:   apiKey,

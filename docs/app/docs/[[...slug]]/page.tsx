@@ -19,12 +19,15 @@ export default async function Page(props: {
   const MDXContent = page.data.body;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage tableOfContent={{
+      style: 'clerk',
+    }} toc={page.data.toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <MDXContent
           components={getMDXComponents({
+            // TODO Consider static export instead of edge runtime https://fumadocs.dev/docs/ui/static-export#built-in-search
             // NOTE Commented out for compatibility with Cloudflare Pages edge runtime (Error: `createRelativeLink` is only supported in Node.js environment)
             // this allows you to link to other pages with relative file paths
             // a: createRelativeLink(source, page),

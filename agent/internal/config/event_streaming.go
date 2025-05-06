@@ -85,14 +85,19 @@ type DestinationConfig struct {
 	Filter string `yaml:"filter,omitempty"`
 	// API Key (generic)
 	APIKey string `yaml:"apiKey,omitempty"`
+	// Endpoint (generic)
+	Endpoint string `yaml:"endpoint,omitempty"`
 	// Project Token (Mixpanel)
 	ProjectToken string `yaml:"projectToken,omitempty"`
+	// API Endpoint (Mixpanel)
+	APIEndpoint string `yaml:"apiEndpoint,omitempty"`
+	// Data Endpoint (Mixpanel)
+	DataEndpoint string `yaml:"dataEndpoint,omitempty"`
 	// BigQuery specific configuration
 	TableID         string `yaml:"tableId,omitempty"`
 	CredentialsJSON string `yaml:"credentialsJson,omitempty"`
 	// S3 specific configuration
 	Bucket    string `yaml:"bucket,omitempty"`
-	Endpoint  string `yaml:"endpoint,omitempty"`
 	Region    string `yaml:"region,omitempty"`
 	RootDir   string `yaml:"rootDir,omitempty"`
 	AccessKey string `yaml:"accessKey,omitempty"`
@@ -156,9 +161,32 @@ func (dc *DestinationConfig) Validate(destKey string) error {
 		if dc.ProjectToken, err = env.ValueOrRequiredEnvVar(dc.ProjectToken); err != nil {
 			return fmt.Errorf("project token is required for Mixpanel destination: %w", err)
 		}
+		// Endpoint is optional for Mixpanel
+		if dc.APIEndpoint != "" {
+			dc.APIEndpoint, _ = env.ValueOrRequiredEnvVar(dc.APIEndpoint)
+		}
+		if dc.DataEndpoint != "" {
+			dc.DataEndpoint, _ = env.ValueOrRequiredEnvVar(dc.DataEndpoint)
+		}
+		if dc.APIEndpoint == "" {
+			dc.APIEndpoint = "https://api.mixpanel.com"
+		}
+		if dc.DataEndpoint == "" {
+			dc.DataEndpoint = "https://data.mixpanel.com"
+		}
 	} else if destKey == "amplitude" || destKey == "posthog" {
 		if dc.APIKey, err = env.ValueOrRequiredEnvVar(dc.APIKey); err != nil {
 			return fmt.Errorf("API key is required for %s destination: %w", destKey, err)
+		}
+		if dc.Endpoint != "" {
+			dc.Endpoint, _ = env.ValueOrRequiredEnvVar(dc.Endpoint)
+		}
+		if dc.Endpoint == "" {
+			if destKey == "amplitude" {
+				dc.Endpoint = "https://api2.amplitude.com"
+			} else if destKey == "posthog" {
+				dc.Endpoint = "https://us.i.posthog.com"
+			}
 		}
 	} else if destKey == "e2e_test_processed_events" || destKey == "e2e_test_db_events" {
 		return nil
@@ -387,8 +415,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Destination: e2eDest,
 			})
 		case "mixpanel":
-			// TODO Review additional config options
-			mp, err := destinations.NewMixpanelDestination(destination.ProjectToken, logger)
+			mp, err := destinations.NewMixpanelDestination(destination.ProjectToken, destination.APIEndpoint, destination.DataEndpoint, logger)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create mixpanel destination: %w", err)
 			}
@@ -398,8 +425,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Destination: mp,
 			})
 		case "posthog":
-			// TODO Pull endpoint from config
-			ph, err := destinations.NewPostHogDestination(destination.APIKey, "https://us.i.posthog.com", logger)
+			ph, err := destinations.NewPostHogDestination(destination.APIKey, destination.Endpoint, logger)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create posthog destination: %w", err)
 			}
@@ -409,8 +435,7 @@ func (esc *EventStreamingConfig) GetInitializedDestinations(logger *slog.Logger)
 				Destination: ph,
 			})
 		case "amplitude":
-			// TODO Pull endpoint from config
-			amp, err := destinations.NewAmplitudeDestination(destination.APIKey, "https://api2.amplitude.com", logger)
+			amp, err := destinations.NewAmplitudeDestination(destination.APIKey, destination.Endpoint, logger)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create amplitude destination: %w", err)
 			}

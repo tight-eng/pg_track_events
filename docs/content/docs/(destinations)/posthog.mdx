@@ -1,6 +1,42 @@
 ---
-title: "Posthog"
-description: "TODO"
+title: "PostHog"
+description: "Send tracked database events to PostHog for analytics"
 ---
 
-TODO
+## Configuration
+
+To configure PostHog as a destination for your tracked events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+destinations:
+  posthog:
+    apiKey: "YOUR_API_KEY_HERE" # or use an environment variable (see below)
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `apiKey`: Your PostHog project API key (required). Can be hardcoded directly in the YAML or [reference an environment variable](/docs/destinations#referencing-environment-variables).
+- `endpoint`: (optional) Custom API endpoint URL for PostHog. Defaults to PostHog Cloud US.
+
+## Getting Your PostHog API Key
+
+To find your project API key:
+
+1. Log in to your PostHog account
+2. Go to Project Settings > Project API Keys
+3. Copy your project API key (it starts with `phc_`)
+
+## Distinct IDs
+
+The system automatically extracts a distinct ID from your event properties for user identification in the following order:
+
+1. `distinct_id` property
+2. Common user ID fields (`user_id`, `userid`, `_user_id`)
+3. For tables named `users`, `user`, or `_users`, it will look for an `id` field
+
+If no ID is found, the distinct ID will be `null`.
+
+## Note
+
+After making configuration changes, restart the pg_track_events agent for them to take effect.

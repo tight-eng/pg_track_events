@@ -17,12 +17,12 @@ type MixpanelDestination struct {
 }
 
 // NewMixpanelDestination creates a new Mixpanel destination with the given project token
-func NewMixpanelDestination(projectToken string, logger *slog.Logger) (*MixpanelDestination, error) {
+func NewMixpanelDestination(projectToken string, apiEndpoint string, dataEndpoint string, logger *slog.Logger) (*MixpanelDestination, error) {
 	if projectToken == "" {
 		return nil, fmt.Errorf("project token is required")
 	}
 
-	client := mixpanel.NewApiClient(projectToken)
+	client := mixpanel.NewApiClient(projectToken, mixpanel.ProxyApiLocation(apiEndpoint), mixpanel.ProxyDataLocation(dataEndpoint))
 	if client == nil {
 		return nil, fmt.Errorf("failed to create Mixpanel client")
 	}

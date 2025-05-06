@@ -1,0 +1,44 @@
+---
+title: "Mixpanel"
+description: "Send tracked database events to Mixpanel for analytics"
+---
+
+## Configuration
+
+To configure Mixpanel as a destination for your tracked events, add the following to your `pg_track_events.config.yaml` file:
+
+```yaml
+destinations:
+  mixpanel:
+    projectToken: "YOUR_TOKEN_HERE" # or use an environment variable (see below)
+```
+
+### Configuration Options
+
+- `filter`: Event name glob filter (optional) [Learn about filtering events](/docs/destinations#destination-event-name-filters)
+- `projectToken`: Your Mixpanel project token (required). Can be hardcoded directly in the YAML or [reference an environment variable](/docs/destinations#referencing-environment-variables).
+- `apiEndpoint`: (optional) Custom API endpoint URL for Mixpanel. Defaults to US cloud.
+- `dataEndpoint`: (optional) Custom data endpoint URL for Mixpanel. Defaults to US cloud.
+
+## Getting Your Mixpanel Project Token
+
+To find your project token:
+
+1. Log in to your Mixpanel account
+2. Go to project settings: https://mixpanel.com/settings/project/
+3. Look for "Access Keys" section
+4. Copy your project token
+
+## Distinct IDs
+
+The system automatically extracts a distinct ID from your event properties for user identification in the following order:
+
+1. `distinct_id` property
+2. Common user ID fields (`user_id`, `userid`, `_user_id`)
+3. For tables named `users`, `user`, or `_users`, it will look for an `id` field
+
+If no ID is found, the distinct ID will be `null`.
+
+## Note
+
+After making configuration changes, restart the pg_track_events agent for them to take effect.
