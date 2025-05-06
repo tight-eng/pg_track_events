@@ -666,7 +666,7 @@ const PostgresEventTrackingFlow = () => {
     <div className="w-full h-[calc(100vh-100px)]">
       <div className="p-4 md:pt-8 max-w-3xl mx-auto text-center">
         <h1 className="text-4xl md:text-5xl font-bold mb-4 max-w-4xl m-auto">Accurate analytics straight from your database</h1>
-        <p className="text-gray-400 text-lg mb-4">Your database knows what happened — why aren't you listening?<br />pg_track_events emits analytics events as your data changes. </p>
+        <p className="text-gray-400 text-lg mb-4">Your database knows what happened — why aren&apos;t you listening?<br />pg_track_events emits analytics events as your data changes. </p>
         <Link href="/docs">
           <button
             className="inline-flex items-center px-6 py-3 text-sm font-medium text-gray-900 bg-emerald-400 rounded-full hover:bg-emerald-500 transition-colors cursor-pointer"
