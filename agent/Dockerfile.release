@@ -10,8 +10,9 @@ ARG TARGETPLATFORM
 COPY bin/amd64/pg_track_events-agent-linux-amd64 /app/pg_track_events-agent-amd64
 COPY bin/arm64/pg_track_events-agent-linux-arm64 /app/pg_track_events-agent-arm64
 
-# Set up proper binary based on architecture
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+# Set up proper binary based on architecture and install required dependencies
+RUN apk add --no-cache ca-certificates && \
+    if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
       cp /app/pg_track_events-agent-amd64 /app/pg_track_events-agent; \
     elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
       cp /app/pg_track_events-agent-arm64 /app/pg_track_events-agent; \

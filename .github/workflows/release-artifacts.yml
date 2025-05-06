@@ -35,7 +35,7 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             EXTENSION=".exe"
           fi
-          go build -o "pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
+          go build -ldflags="-linkmode external -extldflags '-static'" -o "pg_track_events-agent-${{ matrix.goos }}-${{ matrix.goarch }}${EXTENSION}" .
 
       - name: Upload binary to artifacts
         uses: actions/upload-artifact@v4
