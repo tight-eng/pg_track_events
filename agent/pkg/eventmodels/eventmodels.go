@@ -40,6 +40,7 @@ type DBEvent struct {
 	ProcessAfter *time.Time      `json:"process_after,omitempty"`
 	OldRow       json.RawMessage `json:"old_row,omitempty"`
 	NewRow       json.RawMessage `json:"new_row,omitempty"`
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
 }
 
 type DBEventUpdate struct {

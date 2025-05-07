@@ -37,6 +37,10 @@ The system automatically extracts a distinct ID from your event properties for u
 
 If no ID is found, the distinct ID will be `null`.
 
+<Callout title="PostHog will reject events with missing distinct IDs" type="error">
+  If no distinct ID is found or is null/empty, PostHog will reject the events and they will accumulate in the outbox table in your PostgreSQL database. Make sure to always include a valid distinct ID in your event properties to ensure proper event processing when sending to PostHog.
+</Callout>
+
 ## Note
 
 After making configuration changes, restart the pg_track_events agent for them to take effect.

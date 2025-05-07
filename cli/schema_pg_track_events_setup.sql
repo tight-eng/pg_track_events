@@ -15,6 +15,7 @@ CREATE TABLE schema_pg_track_events.event_log (
     process_after TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     old_row JSONB,
     new_row JSONB,
+    metadata JSONB,
     CONSTRAINT event_type_update_check CHECK (
       (event_type = 'update' AND old_row IS NOT NULL AND new_row IS NOT NULL) OR
       (event_type != 'update')

@@ -53,7 +53,7 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 	tableName := fmt.Sprintf("%s.%s", cfg.InternalSchemaName, cfg.EventLogTableName)
 
 	query := fmt.Sprintf(`
-		SELECT id, event_type, row_table_name, logged_at, retries, last_error, last_retry_at, process_after, old_row, new_row
+		SELECT id, event_type, row_table_name, logged_at, retries, last_error, last_retry_at, process_after, old_row, new_row, metadata
 		FROM %s
 		WHERE process_after < $1
 		ORDER BY process_after
@@ -72,7 +72,7 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 	for rows.Next() {
 		var event eventmodels.DBEvent
 		var eventTypeStr string
-		var oldRow, newRow pgtype.Text
+		var oldRow, newRow, metadata pgtype.Text
 
 		if err := rows.Scan(
 			&event.ID,
@@ -85,6 +85,7 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 			&event.ProcessAfter,
 			&oldRow,
 			&newRow,
+			&metadata,
 		); err != nil {
 			tx.Rollback(ctx)
 			return nil, nil, fmt.Errorf("failed to scan event: %w", err)
@@ -98,6 +99,10 @@ func FetchDBEvents(ctx context.Context, pool *pgxpool.Pool) ([]*eventmodels.DBEv
 
 		if newRow.Valid {
 			event.NewRow = json.RawMessage(newRow.String)
+		}
+
+		if metadata.Valid {
+			event.Metadata = json.RawMessage(metadata.String)
 		}
 
 		events = append(events, &event)
