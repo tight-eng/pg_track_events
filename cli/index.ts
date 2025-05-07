@@ -8,12 +8,11 @@ import path from "path";
 import ora from "ora";
 import kleur from "kleur";
 import { createAgentUser } from "./create-agent-user";
-import { existsSync } from "fs";
+import { existsSync, watch } from "fs";
 import { parseConfigFile } from "./config/config";
 import { dropTight } from "./drop";
 import { getIntrospectedSchema } from "./config/introspection";
 const program = new Command();
-
 
 program
   .name("init")
@@ -92,47 +91,86 @@ program
   .description(
     "Validates the pg_track_events.config.yaml configuration is valid and compliant with your db schemas"
   )
+  .option("--watch", "watch for changes in the config file and revalidate")
   .argument(
     "[config-yml]",
     "manually provide the path to your pg_track_events.config.yaml"
   )
-  .action(async (configYml) => {
-    const [sql] = await getDBConnection();
+  .action(async (configYml, options) => {
+    // Check if we're in CI or non-interactive mode
+    const isCI = process.env.CI === "true" || !process.stdout.isTTY;
+    if (options.watch && isCI) {
+      console.log(
+        kleur.red(
+          "Watch mode is not allowed in CI or non-interactive environments"
+        )
+      );
+      process.exit(1);
+    }
 
-    const introspectedSchema = await getIntrospectedSchema(sql);
+    const validateConfig = async (configPath: string) => {
+      const [sql] = await getDBConnection();
+      const introspectedSchema = await getIntrospectedSchema(sql);
 
+      const spinner = ora(
+        "Validating mapping from database changes to analytics events..."
+      ).start();
+      const config = await parseConfigFile(configPath, introspectedSchema);
+
+      if (config.data) {
+        spinner.succeed(
+          kleur.dim(
+            "Validated! Deploy this config in an analytics agent to capture defined events."
+          )
+        );
+        if (!options.watch) {
+          process.exit(0);
+        }
+      } else if (config.error.length > 0) {
+        spinner.fail(
+          kleur.red(`${config.error.length} validation errors found.`)
+        );
+        console.log("\n");
+        for (const error of config.error) {
+          console.log(error.lines + "\n");
+        }
+
+        console.log("\n");
+        if (!options.watch) {
+          console.log(
+            kleur.dim(
+              `Re-run "pg_track_events validate${
+                configYml ? " " + configPath : ""
+              }" to check again`
+            )
+          );
+          process.exit(1);
+        }
+      }
+    };
+
+    // Get config path first
     const configPath = await getConfigPath(configYml);
 
-    const spinner = ora(
-      "Validating mapping from database changes to analytics events..."
-    ).start();
-    const config = await parseConfigFile(configPath, introspectedSchema);
-    if (config.data) {
-      spinner.succeed(
-        kleur.dim(
-          "Validated! Deploy this config in an analytics agent to capture defined events."
-        )
-      );
-      process.exit(0);
-    } else if (config.error.length > 0) {
-      spinner.fail(
-        kleur.red(`${config.error.length} validation errors found.`)
-      );
-      console.log("\n");
-      for (const error of config.error) {
-        console.log(error.lines + "\n");
-      }
+    // Run validation immediately
+    await validateConfig(configPath);
 
-      console.log("\n");
-      console.log(
-        kleur.dim(
-          `Re-run "pg_track_events validate${
-            configYml ? " " + configPath : ""
-          }" to check again`
-        )
-      );
+    // If watch mode is enabled, set up file watching
+    if (options.watch) {
+      console.log(kleur.dim(`\nWatching for changes in ${configPath}...`));
 
-      process.exit(1);
+      const watcher = watch(configPath, async (eventType) => {
+        if (eventType === "change") {
+          console.log(kleur.dim("\nConfig file changed, revalidating..."));
+          await validateConfig(configPath);
+        }
+      });
+
+      // Keep the process running
+      process.on("SIGINT", () => {
+        watcher.close();
+        process.exit(0);
+      });
     }
   });
 
@@ -239,7 +277,9 @@ async function getConfigPath(configYml: string): Promise<string> {
       )
     );
     console.log(
-      kleur.dim("\npg_track_events [command] path/to/pg_track_events.config.yaml\n")
+      kleur.dim(
+        "\npg_track_events [command] path/to/pg_track_events.config.yaml\n"
+      )
     );
     process.exit(1);
   }

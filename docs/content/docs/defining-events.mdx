@@ -70,6 +70,12 @@ The `pg_track_events validate` command validates the event transformations and r
 pg_track_events validate
 ```
 
+`--watch` flag will watch the file for changes and validate on each save. 
+
+```bash
+pg_track_events validate --watch
+```
+
 **Pro Tips:** 
 - If the CLI keeps asking you for a `DATABASE_URL` try using a local `.env` file or put it in your shell environment. The CLI will first try reading from there before asking. 
 - You can pass in the path to your config file, if you have moved it to a different location `pg_track_events validate /path/to/pg_track_events.config.yaml`
