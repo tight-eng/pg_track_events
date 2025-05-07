@@ -89,7 +89,6 @@ func (b *BigQueryDestination) SendBatch(ctx context.Context, processedEvents []*
 			Timestamp:   event.Timestamp,
 			ProcessedAt: time.Now(),
 		}
-		fmt.Println("bigqueryEvents", bigqueryEvents[i])
 	}
 
 	// Get the table reference

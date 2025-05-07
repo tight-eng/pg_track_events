@@ -1,47 +1,316 @@
+# Based on the Chinook dataset: https://neon.tech/docs/import/import-sample-data#chinook-database
+
 track:
-  user.insert:
-    event: "user_signup"
+  ############################################################
+  #  CUSTOMER
+  ############################################################
+
+  Customer.insert:
+    event: "customer_created"
     properties:
-      id: "new.id"
-      email: "new.email"
-      name: "new.name"
-      # data: "new.data"
-      # data_inner: "new.data.inner"
+      id: "new.CustomerId"
+      first_name: "new.FirstName"
+      last_name: "new.LastName"
+      email: "new.Email"
+      company: "new.Company"
+      city: "new.City"
+      country: "new.Country"
+      support_rep_id: "new.SupportRepId"
 
-  # user.update:
-  #   event: "user_updated"
-  #   properties:
-  #     id: "new.id"
-  #     email: "new.email"
-  #     name: "new.name"
+  Customer.update:
+    # Branch on e‑mail change; otherwise fire a generic update.
+    cond: "old.Email != new.Email ? events.customer_changed_email : events.customer_updated"
+    "customer_changed_email":
+      id: "new.CustomerId"
+      previous_email: "old.Email"
+      new_email: "new.Email"
+    "customer_updated":
+      id: "new.CustomerId"
+      email: "new.Email"
+      city: "new.City"
+      country: "new.Country"
 
-  user.update:
-    cond: "old.email != new.email ? events.user_changed_email : events.user_updated"
-    "user_changed_email":
-      id: "new.id"
-      previous_email: "old.email"
-      new_email: "new.email"
-    "user_updated":
-      id: "new.id"
-      email: "new.email"
-      name: "new.name"
-      # data: "new.data"
-      # data_inner: "new.data['inner']"
+  Customer.delete:
+    event: "customer_deleted"
+    properties:
+      id: "old.CustomerId"
+      email: "old.Email"
+
+  ############################################################
+  #  INVOICE
+  ############################################################
+
+  Invoice.insert:
+    event: "invoice_created"
+    properties:
+      id: "new.InvoiceId"
+      customer_id: "new.CustomerId"
+      total: "new.Total"
+      invoice_date: "new.InvoiceDate"
+
+  Invoice.update:
+    # If total changes emit a specific event, else generic update.
+    cond: "old.Total != new.Total ? events.invoice_total_adjusted : events.invoice_updated"
+    "invoice_total_adjusted":
+      id: "new.InvoiceId"
+      old_total: "old.Total"
+      new_total: "new.Total"
+    "invoice_updated":
+      id: "new.InvoiceId"
+      billing_country: "new.BillingCountry"
+      billing_city: "new.BillingCity"
+
+  Invoice.delete:
+    event: "invoice_deleted"
+    properties:
+      id: "old.InvoiceId"
+      customer_id: "old.CustomerId"
+      total: "old.Total"
+
+  ############################################################
+  #  INVOICE LINE
+  ############################################################
+
+  InvoiceLine.insert:
+    event: "invoice_line_added"
+    properties:
+      invoice_line_id: "new.InvoiceLineId"
+      invoice_id: "new.InvoiceId"
+      track_id: "new.TrackId"
+      quantity: "new.Quantity"
+      unit_price: "new.UnitPrice"
+
+  InvoiceLine.update:
+    cond: "old.Quantity != new.Quantity ? events.invoice_line_quantity_changed : events.invoice_line_updated"
+    "invoice_line_quantity_changed":
+      invoice_line_id: "new.InvoiceLineId"
+      previous_quantity: "old.Quantity"
+      new_quantity: "new.Quantity"
+    "invoice_line_updated":
+      invoice_line_id: "new.InvoiceLineId"
+      unit_price: "new.UnitPrice"
+
+  InvoiceLine.delete:
+    event: "invoice_line_deleted"
+    properties:
+      invoice_line_id: "old.InvoiceLineId"
+      invoice_id: "old.InvoiceId"
+
+  ############################################################
+  #  PLAYLIST + PLAYLIST_TRACK
+  ############################################################
+
+  Playlist.insert:
+    event: "playlist_created"
+    properties:
+      id: "new.PlaylistId"
+      name: "new.Name"
+
+  Playlist.update:
+    cond: "old.Name != new.Name ? events.playlist_renamed : events.playlist_updated"
+    "playlist_renamed":
+      id: "new.PlaylistId"
+      old_name: "old.Name"
+      new_name: "new.Name"
+    "playlist_updated":
+      id: "new.PlaylistId"
+      name: "new.Name"
+
+  Playlist.delete:
+    event: "playlist_deleted"
+    properties:
+      id: "old.PlaylistId"
+      name: "old.Name"
+
+  PlaylistTrack.insert:
+    event: "track_added_to_playlist"
+    properties:
+      playlist_id: "new.PlaylistId"
+      track_id: "new.TrackId"
+
+  PlaylistTrack.delete:
+    event: "track_removed_from_playlist"
+    properties:
+      playlist_id: "old.PlaylistId"
+      track_id: "old.TrackId"
+
+  ############################################################
+  #  TRACK
+  ############################################################
+
+  Track.insert:
+    event: "track_created"
+    properties:
+      id: "new.TrackId"
+      name: "new.Name"
+      album_id: "new.AlbumId"
+      genre_id: "new.GenreId"
+      milliseconds: "new.Milliseconds"
+      unit_price: "new.UnitPrice"
+
+  Track.update:
+    cond: "old.UnitPrice != new.UnitPrice ? events.track_price_changed : events.track_updated"
+    "track_price_changed":
+      id: "new.TrackId"
+      old_price: "old.UnitPrice"
+      new_price: "new.UnitPrice"
+    "track_updated":
+      id: "new.TrackId"
+      name: "new.Name"
+      composer: "new.Composer"
+      # producers_matrix: "new.producers_matrix" #[0][0][0][0][0][0]"
+      # producers_array: "new.producers_array" #[0]"
+      # metadata: "has(new.meta.foo) ? new.meta.foo : null"
+
+  Track.delete:
+    event: "track_deleted"
+    properties:
+      id: "old.TrackId"
+      name: "old.Name"
+
+  ############################################################
+  #  ALBUM
+  ############################################################
+
+  Album.insert:
+    event: "album_created"
+    properties:
+      id: "new.AlbumId"
+      title: "new.Title"
+      artist_id: "new.ArtistId"
+
+  Album.update:
+    cond: "old.Title != new.Title ? events.album_renamed : events.album_updated"
+    "album_renamed":
+      id: "new.AlbumId"
+      old_title: "old.Title"
+      new_title: "new.Title"
+    "album_updated":
+      id: "new.AlbumId"
+      title: "new.Title"
+
+  Album.delete:
+    event: "album_deleted"
+    properties:
+      id: "old.AlbumId"
+      title: "old.Title"
+
+  ############################################################
+  #  ARTIST
+  ############################################################
+
+  Artist.insert:
+    event: "artist_created"
+    properties:
+      id: "new.ArtistId"
+      name: "new.Name"
+
+  Artist.update:
+    cond: "old.Name != new.Name ? events.artist_renamed : events.artist_updated"
+    "artist_renamed":
+      id: "new.ArtistId"
+      old_name: "old.Name"
+      new_name: "new.Name"
+    "artist_updated":
+      id: "new.ArtistId"
+      name: "new.Name"
+
+  Artist.delete:
+    event: "artist_deleted"
+    properties:
+      id: "old.ArtistId"
+      name: "old.Name"
+
+  ############################################################
+  #  EMPLOYEE
+  ############################################################
+
+  Employee.insert:
+    event: "employee_hired"
+    properties:
+      id: "new.EmployeeId"
+      first_name: "new.FirstName"
+      last_name: "new.LastName"
+      title: "new.Title"
+      reports_to: "new.ReportsTo"
+
+  Employee.update:
+    # Two‑level branching: title change vs manager change vs generic update.
+    cond: "old.Title != new.Title ? events.employee_promoted : (old.ReportsTo != new.ReportsTo ? events.employee_reassigned : events.employee_updated)"
+    "employee_promoted":
+      id: "new.EmployeeId"
+      old_title: "old.Title"
+      new_title: "new.Title"
+    "employee_reassigned":
+      id: "new.EmployeeId"
+      previous_manager: "old.ReportsTo"
+      new_manager: "new.ReportsTo"
+    "employee_updated":
+      id: "new.EmployeeId"
+      title: "new.Title"
+      reports_to: "new.ReportsTo"
+
+  Employee.delete:
+    event: "employee_departed"
+    properties:
+      id: "old.EmployeeId"
+      first_name: "old.FirstName"
+      last_name: "old.LastName"
+
+  ############################################################
+  #  LOOKUP‑LIKE TABLES (GENRE, MEDIATYPE)
+  ############################################################
+
+  Genre.insert:
+    event: "genre_created"
+    properties:
+      id: "new.GenreId"
+      name: "new.Name"
+
+  Genre.update:
+    event: "genre_updated"
+    properties:
+      id: "new.GenreId"
+      name: "new.Name"
+
+  Genre.delete:
+    event: "genre_deleted"
+    properties:
+      id: "old.GenreId"
+      name: "old.Name"
+
+  MediaType.insert:
+    event: "media_type_created"
+    properties:
+      id: "new.MediaTypeId"
+      name: "new.Name"
+
+  MediaType.update:
+    event: "media_type_updated"
+    properties:
+      id: "new.MediaTypeId"
+      name: "new.Name"
+
+  MediaType.delete:
+    event: "media_type_deleted"
+    properties:
+      id: "old.MediaTypeId"
+      name: "old.Name"
 
 destinations:
-  posthog:
-    filter: "*"
-    apiKey: "$POSTHOG_API_KEY"
-  mixpanel:
-    filter: "*"
-    projectToken: "$MIXPANEL_PROJECT_TOKEN"
-  amplitude:
-    filter: "*"
-    apiKey: "$AMPLITUDE_API_KEY"
-  bigquery:
-    filter: "*"
-    tableId: "$BIGQUERY_TABLE_ID"
-    credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
+  # posthog:
+  #   filter: "*"
+  #   apiKey: "$POSTHOG_API_KEY"
+  # mixpanel:
+  #   filter: "*"
+  #   projectToken: "$MIXPANEL_PROJECT_TOKEN"
+  # amplitude:
+  #   filter: "*"
+  #   apiKey: "$AMPLITUDE_API_KEY"
+  # bigquery:
+  #   filter: "*"
+  #   tableId: "$BIGQUERY_TABLE_ID"
+  #   credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
   s3:
     filter: "*"
     bucket: "$S3_BUCKET"
@@ -52,10 +321,10 @@ destinations:
     secretKey: "$S3_SECRET_KEY"
 
 raw_db_event_destinations:
-  bigquery:
-    filter: "*"
-    tableId: "$BIGQUERY_RAW_DB_EVENTS_TABLE_ID"
-    credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
+  # bigquery:
+  #   filter: "*"
+  #   tableId: "$BIGQUERY_RAW_DB_EVENTS_TABLE_ID"
+  #   credentialsJson: "$BIGQUERY_CREDENTIALS_JSON"
   s3:
     filter: "*"
     bucket: "$S3_BUCKET"

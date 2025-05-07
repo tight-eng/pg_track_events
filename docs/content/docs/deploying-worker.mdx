@@ -31,11 +31,12 @@ docker run -it -e DATABASE_URL="..." -e POSTHOG_API_KEY="..." pg_track_events_ag
 
 - The container will fail to start if you do not provide a `DATABASE_URL`, and the API keys for the destinations you set up. 
 - You handle the networking. The container assumes it can reach the Postgres instance and the destinations.
-- Adding a new destination, won’t trigger a backfill. 
+- Adding a new destination won’t trigger a backfill. 
 - You probably only need one worker, but having more than one running won’t break anything or lead to duplicate events. 
-- Downtime redeploying the container won’t cause any events to be missed. They remain in the outbox until processed. 
-- If destination is down the data won’t get there. Today we don't have a retry mechanism to ensure delivery. 
-
+- Downtime redeploying the container won’t cause any events to be missed. The unprocessed events remain in the outbox until processed. 
+- Destination outages or delivery errors will prevent events from leaving the outbox (you will not lose data). Delivery errors are tracked in the outbox and the worker will follow an exponential backoff (up to a max of 60mins) to retry events. After reaching 60mins, events will continue to be retried hourly.
+- Destinations without event deduplication logic, currently just BigQuery and S3, may occasionally see duplicate records in the case of batch retries where some events may have already been successfully written while others failed. When consuming data from BigQuery and S3, you can use the event name and ID for processed events or just the ID for raw database change events to deduplicate as you query or read data out of those destinations.
 
 ### Need something more scalable?
-We're working on a worker that can stream off the WAL. It doesn't require the outbok table, will be more performant, and more reliable. If you'd like to contribute or share your use case please add a comment to [this issue](https://github.com/tight-eng/pg_track_events/issues/1).
+
+We're working on a worker that can stream off the WAL. It doesn't require the outbox table, will be more performant, and more reliable. If you'd like to contribute or share your use case please add a comment to [this issue](https://github.com/tight-eng/pg_track_events/issues/1).

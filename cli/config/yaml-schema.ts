@@ -43,15 +43,9 @@ const trackingConfigSchema = z.record(
   eventConfigSchema
 );
 
-// Schema for API key configuration (either env var or static value)
-const apiKeySchema = z.union([
-  z.string().regex(/^\$[A-Z_]+$/), // Environment variable format: $VARIABLE_NAME
-  z.string(), // Static API key
-]);
-
 // Schema for destination configuration
 const destinationConfigSchema = z.object({
-  apiKey: apiKeySchema,
+  // TODO Make this stricter to validate setup of db event destinations
   filter: z.string().default("*"), // Default to "*" if not specified
 });
 
@@ -72,12 +66,25 @@ const ignoreSchema = z.record(
   ])
 );
 
+const rawDBEventDestinationSchema= z.object({
+  // TODO Make this stricter to validate setup of db event destinations
+  filter: z.string().default("*"), // Default to "*" if not specified
+});
+
+const rawDBEventDestinationsSchema = z
+.record(
+  z.string(), // Destination name (e.g., "s3", "bigquery")
+  rawDBEventDestinationSchema
+)
+.optional();
+
 // Main schema for the YAML file
 const analyticsConfigSchema = z
   .object({
     track: trackingConfigSchema,
     ignore: ignoreSchema.optional(),
     destinations: destinationsSchema,
+    raw_db_event_destinations: rawDBEventDestinationsSchema,
   })
   .strict();
 

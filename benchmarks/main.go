@@ -271,7 +271,7 @@ $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
 		BEGIN
-			NEW.status_not_exists := NULL;
+			NEW.status := NULL;
 		EXCEPTION
 			WHEN undefined_column THEN
 				NULL;
@@ -289,13 +289,13 @@ BEGIN
         );
     ELSIF (TG_OP = 'UPDATE') THEN
 		BEGIN
-			NEW.status_not_exists := NULL;
+			NEW.status := NULL;
 		EXCEPTION
 			WHEN undefined_column THEN
 				NULL;
 		END;
 		BEGIN
-			OLD.status_not_exists := NULL;
+			OLD.status := NULL;
 		EXCEPTION
 			WHEN undefined_column THEN
 				NULL;
@@ -313,7 +313,7 @@ BEGIN
         );
     ELSIF (TG_OP = 'DELETE') THEN
 		BEGIN
-			OLD.status_not_exists := NULL;
+			OLD.status := NULL;
 		EXCEPTION
 			WHEN undefined_column THEN
 				NULL;

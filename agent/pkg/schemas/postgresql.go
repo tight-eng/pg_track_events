@@ -88,6 +88,44 @@ type PostgresqlTableSchema struct {
 
 type PostgresqlTableSchemaList []*PostgresqlTableSchema
 
+// getBaseTypeAndDimensions extracts the base type and number of dimensions from a PostgreSQL type
+func getBaseTypeAndDimensions(pgType string) (baseType string, dimensions int) {
+	dimensions = 0
+	baseType = pgType
+	for strings.HasSuffix(baseType, "[]") {
+		dimensions++
+		baseType = strings.TrimSuffix(baseType, "[]")
+	}
+	return baseType, dimensions
+}
+
+// mapPostgresTypeToProto maps a PostgreSQL type to its protobuf equivalent
+func mapPostgresTypeToProto(pgType string) (fieldType *descriptorpb.FieldDescriptorProto_Type, typeName *string) {
+	baseType, _ := getBaseTypeAndDimensions(pgType)
+
+	// Map base types to protobuf types
+	switch baseType {
+	case "integer", "bigint", "serial", "bigserial", "smallint", "smallserial":
+		return descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum(), nil
+	case "text", "varchar", "char", "character varying", "uuid", "money", "xml",
+		"timestamp", "timestamptz", "date", "time", "timetz", "interval",
+		"cidr", "inet", "macaddr", "macaddr8",
+		"point", "line", "lseg", "box", "path", "polygon", "circle":
+		return descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), nil
+	case "boolean":
+		return descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum(), nil
+	case "double precision", "real", "numeric", "decimal":
+		return descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum(), nil
+	case "bytea", "bit", "bit varying":
+		return descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(), nil
+	case "json", "jsonb", "hstore":
+		return descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), proto.String(".google.protobuf.Value")
+	default:
+		// For unknown types, use Value
+		return descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(), proto.String(".google.protobuf.Value")
+	}
+}
+
 // createFieldDescriptor creates a protobuf field descriptor from a PostgreSQL column
 func (column *PostgresqlTableColumn) createFieldDescriptor(fieldNumber int32) *descriptorpb.FieldDescriptorProto {
 	field := &descriptorpb.FieldDescriptorProto{
@@ -95,29 +133,19 @@ func (column *PostgresqlTableColumn) createFieldDescriptor(fieldNumber int32) *d
 		Number: proto.Int32(fieldNumber),
 	}
 
-	// Map PostgreSQL types to protobuf types
-	switch column.Type {
-	case "integer", "bigint", "serial", "bigserial":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_INT64.Enum()
-	case "text", "varchar", "char", "character varying":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
-	case "boolean":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_BOOL.Enum()
-	case "double precision", "real":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
-	case "timestamp", "timestamptz", "date":
-		// TODO Do we want to give special treatment to timestamp/timestamptz?
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
-	case "json", "jsonb":
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
-		field.TypeName = proto.String(".google.protobuf.Value")
-	default:
-		// Default to string for unknown types
-		field.Type = descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum()
-	}
-
 	// NOTE: Protobuf v3 doesn't support required fields so we don't add those labels
 	//       Learn more: https://stackoverflow.com/questions/31801257/why-required-and-optional-is-removed-in-protocol-buffers-3
+
+	// Get the base type and number of dimensions
+	_, dimensions := getBaseTypeAndDimensions(column.Type)
+	if dimensions > 0 {
+		// NOTE: Protobuf arrays are too restrictive compared to PostgreSQL arrays
+		//       so we use a message instead. TODO Revisit for better type checking.
+		field.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+		field.TypeName = proto.String(".google.protobuf.Value")
+	} else {
+		field.Type, field.TypeName = mapPostgresTypeToProto(column.Type)
+	}
 
 	return field
 }
