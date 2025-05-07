@@ -3,7 +3,7 @@ title: Defining Events
 description: Learn how to define analytic events from your database
 ---
 
-`pg_track_events` captures changes to rows in your database (ie inserts, updates, deletes) and emits analytics events. Before being sent to your analytics destination, raw changes are transformed into semantic events based on the logic defined in the `pg_track_events.config.yaml` file.
+`pg_track_events` captures changes to rows in your database (ie inserts, updates, deletes) and emits analytics events. Before being sent to your analytics destination the changes are transformed into semantic events based on the logic defined in the `pg_track_events.config.yaml` file.
 
 Examples: 
 - `inserted user` -> `USER_SIGNUP {email}`
@@ -28,11 +28,11 @@ track:
 
 Provide a semantic `event` name for use in your analytics tool, and the `properties` you want to track. These `properties` are columns from the table and can be referenced using dot notation. 
 
-- `insert` events will have `new` keyword to reference the new row's values. 
+- `insert` events will have a `new` object binding to reference the new row's values. 
 
-- `update` events will have `new` and `old` keywords to reference the new and old row's values. 
+- `update` events will have a `new` and `old` object bindings to reference the new and old row's values. 
 
-- `delete` events will have `old` keyword to reference the deleted row's values. 
+- `delete` events will have an `old` object binding to reference the deleted row's values. 
 
 
 | Note: for most simple cases you will only need to use dot notation, but under the hood each of the `properties` statements are [CEL](https://github.com/google/cel-spec) expressions, supporting more complex transformations in the future. 
@@ -64,7 +64,7 @@ track:
 
 ## Validating
 
-The `pg_track_events validate` commands validates the event transformations are valid and reference real tables and columns. Run it as you are defining and updating events. 
+The `pg_track_events validate` command validates the event transformations and reference real tables and columns. The worker will not transform events if the validation fails, so you should check the file as you develop it and before you deploy the worker. 
 
 ```bash
 pg_track_events validate

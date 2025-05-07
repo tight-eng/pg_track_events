@@ -12,9 +12,9 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 🛡️ **Secure and self-hosted** — runs in your VPC, no SaaS relay.
 
-🧠 **Semantic events, not raw logs** — transform DB changes into intelligible events with simple logic (Google CEL).
+🧠 **Semantic events, not raw logs** — transform DB changes into intelligible events with simple logic ([Google CEL](https://cel.dev/)).
 
-⚡️ **Easy setup, then scalable** — start with Postgres triggers ([imperceptible (+10-20µs) write latency - benchmarks](/benchmarks/README.md)), scale to WAL and replicas if needed.
+⚡️ **Easy setup, then scalable** — start with Postgres triggers ([imperceptible (+10-20µs) write latency - benchmarks](https://github.com/tight-eng/pg_track_events/tree/main/benchmarks), scale to WAL and replicas if needed.
 
 ## How it works
 
@@ -22,7 +22,7 @@ Reliable, accurate, backend analytics without a bunch of `.track()` code.
 
 1. Use our CLI to add change triggers to selected Postgres tables (either directly or by dumping a `migration.sql` file)
 1. Define how these changes are transformed into analytics events in `pg_track_events.config.yaml`
-1. Run a Docker container that reads changes from an outbox table ('schema_pg_track_events.event_log`), processes them into analytics events, and forwards them to your desintations.
+1. Run a Docker container that reads changes from an outbox table `schema_pg_track_events.event_log`, processes them into analytics events, and forwards them to your desintations.
 
 ## Quick Start
 
@@ -54,9 +54,9 @@ Directly to the database you have connected by typing (`y/yes`) or by outputting
 
 ### Configure Tracked Events
 
-Add your own trackers and configure destinations in the `pg_track_events.config.yaml`file. [Full specification](/)
+Define analytics events and configure destinations in the `pg_track_events.config.yaml`file. [Full specification](https://tight.sh/docs/defining-events)
 
-```yaml
+```yaml title="pg_track_events.config.yaml"
 track:
   user.insert:
     event: "user_signup"
@@ -85,6 +85,8 @@ ignore:
 ### Deploy a worker
 
 Deploy a worker to your infrastructure. The Docker container created by `init` command should be ready to build and deploy, but you can customize it if you need to.
+
+[Read worker documentation](https://tight.sh/docs/deploying-worker)
 
 ```bash
 # Build image
