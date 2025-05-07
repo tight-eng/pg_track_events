@@ -11,7 +11,7 @@ These workers are easy to deploy and run on any infrastructure that supports Doc
 
 
 ```dockerfile
-FROM --platform=linux/amd64 ghcr.io/tight-eng/pg_track_events/agent:latest
+FROM ghcr.io/tight-eng/pg_track_events/agent:latest
 
 COPY pg_track_events.config.yaml .
 ```
