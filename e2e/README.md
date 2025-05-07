@@ -1,6 +1,6 @@
 # E2E Testing Framework
 
-This directory contains an end-to-end testing framework for the TightDB project. The framework allows you to define test scenarios that simulate real-world database operations and verify the behavior of the analytics agent.
+This directory contains an end-to-end testing framework for the pg_track_events project. The framework allows you to define test scenarios that simulate real-world database operations and verify the behavior of the analytics agent.
 
 ## Structure
 

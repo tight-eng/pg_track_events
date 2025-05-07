@@ -1,22 +1,21 @@
-# TightDB Agent
+# pg_track_events Agent
 
-The TightDB Agent is a service that processes database events from a PostgreSQL database and forwards them to configured destinations. It works by reading events from a dedicated event log table, processing them, and then deleting the processed events.
+The pg_track_events Agent is a service that processes database events from a PostgreSQL database and forwards them to configured destinations. It works by reading events from a dedicated event log table (outbox), processing them, and then deleting the processed events.
 
 ## Setup
 
 ### Prerequisites
 
 - Go 1.22.4 or higher
-- PostgreSQL database
-- API credentials
+- PostgreSQL database (configured with pg_track_events CLI)
 
 ### Installation
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/typeeng/pg_track_events/agent.git
-cd tight-agent
+git clone https://github.com/tight-eng/pg_track_events.git
+cd pg_track_events/agent
 ```
 
 Install dependencies:

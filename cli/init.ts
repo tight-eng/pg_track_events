@@ -158,7 +158,7 @@ export async function init(tightDir: string, sql: SQL, reset: boolean = false) {
     if (!status) {
       console.log(kleur.red("Failed to initialize schema_pg_track_events"));
       console.log(
-        "You may have to manually set up Tight with a migration. Docs here: http://..."
+        "You may have to manually set up pg_track_events with a migration. Docs here: https://tight.sh/docs" // TODO Add link to migrations docs page
       );
       await sql.close();
       return;
